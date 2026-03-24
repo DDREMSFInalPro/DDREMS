@@ -1,0 +1,61 @@
+{
+  "appTitle": "የድሬዳዋ ሪል እስቴት አስተዳደር ስርዓት",
+  "nav": {
+    "dashboard": "ዳሽቦርድ",
+    "verification": "ማረጋገጫ",
+    "reports": "ሪፖርቶች",
+    "logout": "ውጣ"
+  },
+  "dashboard": {
+    "greeting_morning": "እንደምን አደሩ",
+    "greeting_afternoon": "እንደምን ዋሉ",
+    "greeting_evening": "እንደምን አመሹ",
+    "pending": "በመጠባበቅ ላይ ያሉ",
+    "inReview": "በግምገማ ላይ",
+    "verifiedToday": "ዛሬ የተረጋገጡ",
+    "totalVerified": "ጠቅላላ የተረጋገጡ"
+  },
+  "verification": {
+    "title": "የንብረት ማረጋገጫ",
+    "subtitle": "የቀረቡ ንብረቶችን ይገምግሙ እና ያረጋግጡ።",
+    "search": "በርዕስ ወይም ባለቤት ይፈልጉ…",
+    "propertyType": "የንብረት አይነት",
+    "allTypes": "ሁሉም አይነቶች",
+    "review": "ይገምግሙ",
+    "noPending": "በመጠባበቅ ላይ ያሉ ንብረቶች የሉም",
+    "allReviewed": "ሁሉም ንብረቶች ተገምግመዋል።",
+    "noResults": "ምንም ውጤት አልተገኘም",
+    "adjustFilters": "ፍለጋዎን ወይም ማጣሪያዎን ያስተካክሉ።",
+    "columns": {
+      "title": "የንብረት ርዕስ",
+      "owner": "ባለቤት",
+      "type": "አይነት",
+      "price": "ዋጋ",
+      "submitted": "የቀረበበት ቀን",
+      "status": "ሁኔታ",
+      "action": "እርምጃ"
+    }
+  },
+  "reports": {
+    "title": "ሪፖርቶች",
+    "subtitle": "የሽያጭ እና የኪራይ አፈጻጸም ሪፖርቶችን ያዘጋጁ።",
+    "reportType": "የሪፖርት አይነት",
+    "sales": "ሽያጭ",
+    "rentals": "ኪራይ",
+    "startDate": "የጀመሪያ ቀን",
+    "endDate": "የመጨረሻ ቀን",
+    "generate": "ሪፖርት አዘጋጅ",
+    "exportExcel": "ወደ Excel ላክ",
+    "exportPDF": "ወደ PDF ላክ",
+    "print": "ሪፖርት አትም"
+  },
+  "common": {
+    "approve": "አጽድቅ",
+    "reject": "ውድቅ አድርግ",
+    "cancel": "ሰርዝ",
+    "confirm": "አረጋግጥ",
+    "loading": "በመጫን ላይ…",
+    "back": "ተመለስ",
+    "view": "ይመልከቱ"
+  }
+}
