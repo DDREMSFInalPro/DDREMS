@@ -1,0 +1,58 @@
+.App {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-attachment: fixed;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 30px 20px;
+}
+
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  padding: 18px 30px;
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(40, 167, 69, 0.4);
+  z-index: 2000;
+  animation: slideIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  font-weight: 500;
+  backdrop-filter: blur(10px);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(120%) scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 20px 15px;
+  }
+  
+  .notification {
+    right: 10px;
+    left: 10px;
+    padding: 15px 20px;
+  }
+}
