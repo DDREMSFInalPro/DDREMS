@@ -1,0 +1,81 @@
+/**
+ * Payment Controller (Buyer Module)
+ * Handles payment listing for buyers
+ */
+const { Payment, Property, User } = require('../models');
+const { Op } = require('sequelize');
+
+/**
+ * Get all payments made by the authenticated buyer
+ * GET /api/payments
+ */
+const getBuyerPayments = async (req, res, next) => {
+  try {
+    const buyerId = req.user.userId;
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      search = '',
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
+    } = req.query;
+
+    const offset = (page - 1) * limit;
+
+    // Build filter conditions
+    const where = { payerId: buyerId };
+
+    if (status) {
+      where.paymentStatus = status;
+    }
+
+    if (search) {
+      where[Op.or] = [
+        { referenceNumber: { [Op.iLike]: `%${search}%` } },
+        { description: { [Op.iLike]: `%${search}%` } },
+      ];
+    }
+
+    // Valid sort fields
+    const allowedSortFields = ['createdAt', 'amount', 'paymentStatus', 'paidAt'];
+    const orderField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const orderDir = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    const { count, rows: payments } = await Payment.findAndCountAll({
+      where,
+      include: [
+        {
+          model: Property,
+          as: 'property',
+          attributes: ['id', 'title', 'address', 'propertyType'],
+        },
+        {
+          model: User,
+          as: 'ownerUser',
+          attributes: ['id', 'name', 'email', 'phone'],
+        },
+      ],
+      order: [[orderField, orderDir]],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+    });
+
+    res.json({
+      success: true,
+      data: {
+        payments,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(count / limit),
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getBuyerPayments };

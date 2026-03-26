@@ -1,0 +1,61 @@
+{
+  "appTitle": "Dire Dawa Real Estate Management System",
+  "nav": {
+    "dashboard": "Dashboard",
+    "verification": "Verification",
+    "reports": "Reports",
+    "logout": "Logout"
+  },
+  "dashboard": {
+    "greeting_morning": "Good morning",
+    "greeting_afternoon": "Good afternoon",
+    "greeting_evening": "Good evening",
+    "pending": "Pending Verifications",
+    "inReview": "In Review",
+    "verifiedToday": "Verified Today",
+    "totalVerified": "Total Verified"
+  },
+  "verification": {
+    "title": "Property Verification",
+    "subtitle": "Review and verify submitted properties.",
+    "search": "Search by title or owner…",
+    "propertyType": "Property Type",
+    "allTypes": "All Types",
+    "review": "Review",
+    "noPending": "No pending properties",
+    "allReviewed": "All properties have been reviewed.",
+    "noResults": "No results match your filters",
+    "adjustFilters": "Try adjusting your search or filter.",
+    "columns": {
+      "title": "Property Title",
+      "owner": "Owner",
+      "type": "Type",
+      "price": "Price",
+      "submitted": "Submitted",
+      "status": "Status",
+      "action": "Action"
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "subtitle": "Generate sales and rental performance reports.",
+    "reportType": "Report Type",
+    "sales": "Sales",
+    "rentals": "Rentals",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "generate": "Generate Report",
+    "exportExcel": "Export Excel",
+    "exportPDF": "Export PDF",
+    "print": "Print Report"
+  },
+  "common": {
+    "approve": "Approve",
+    "reject": "Reject",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "loading": "Loading…",
+    "back": "Back",
+    "view": "View"
+  }
+}
