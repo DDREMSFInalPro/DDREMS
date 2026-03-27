@@ -1,0 +1,2 @@
+1 beed room | status=forwarded_to_owner | owner=Test Owner (bc4c2e6d-e41b-48ea-a968-e3932d718e04) | buyer_id=6d174f66-a3a1-4a6f-9219-cf2ac6822cb2
+3 beed room aparment | status=pending | owner=Test Owner (bc4c2e6d-e41b-48ea-a968-e3932d718e04) | buyer_id=null

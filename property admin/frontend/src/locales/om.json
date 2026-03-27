@@ -1,0 +1,63 @@
+{
+  "appTitle": "Sirna Bulchiinsa Qabeenya Mana Dire Dawa",
+  "nav": {
+    "dashboard": "Gabatee",
+    "verification": "Mirkaneessa",
+    "documents": "Galmee",
+    "messages": "Ergaa",
+    "reports": "Gabaasa",
+    "logout": "Ba'i"
+  },
+  "dashboard": {
+    "greeting_morning": "Akkam bultan",
+    "greeting_afternoon": "Akkam jirtu",
+    "greeting_evening": "Akkam bultan galgala",
+    "pending": "Eegaa jiru",
+    "inReview": "Qorannoo keessa jiru",
+    "verifiedToday": "Har'a mirkaneeffaman",
+    "totalVerified": "Walumaa galatti mirkaneeffaman"
+  },
+  "verification": {
+    "title": "Mirkaneessa Qabeenya",
+    "subtitle": "Qabeenya dhiyaatan qoradhaa fi mirkaneessaa.",
+    "search": "Mataduree ykn abbaa manaan barbaadi…",
+    "propertyType": "Gosa Qabeenya",
+    "allTypes": "Gosa hunda",
+    "review": "Qoradhu",
+    "noPending": "Qabeenya eegaa jiru hin jiru",
+    "allReviewed": "Qabeenya hundi qorannoo irra darbaniiru.",
+    "noResults": "Bu'aan hin argamne",
+    "adjustFilters": "Barbaacha ykn gingilchaa kee sirreessi.",
+    "columns": {
+      "title": "Mataduree Qabeenya",
+      "owner": "Abbaa",
+      "type": "Gosa",
+      "price": "Gatii",
+      "submitted": "Guyyaa dhiyaate",
+      "status": "Haala",
+      "action": "Tarkaanfii"
+    }
+  },
+  "reports": {
+    "title": "Gabaasota",
+    "subtitle": "Gabaasa raawwii gurgurtaa fi kireeffannaa qopheessi.",
+    "reportType": "Gosa Gabaasa",
+    "sales": "Gurgurtaa",
+    "rentals": "Kireeffannaa",
+    "startDate": "Guyyaa Jalqabaa",
+    "endDate": "Guyyaa Xumuraa",
+    "generate": "Gabaasa Uumi",
+    "exportExcel": "Gara Excel Ergi",
+    "exportPDF": "Gara PDF Ergi",
+    "print": "Gabaasa Maxxansi"
+  },
+  "common": {
+    "approve": "Mirkaneessi",
+    "reject": "Didi",
+    "cancel": "Haqqi",
+    "confirm": "Mirkaneessi",
+    "loading": "Fe'aa jira…",
+    "back": "Duubatti deebi'i",
+    "view": "Ilaali"
+  }
+}

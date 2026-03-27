@@ -1,0 +1,5 @@
+Test Property | status=draft | published=false | deleted=false
+villa | status=active | published=true | deleted=false
+villa | status=active | published=true | deleted=false
+1 beed room | status=active | published=true | deleted=false
+3 beed room aparment | status=draft | published=false | deleted=false
