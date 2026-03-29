@@ -15,6 +15,7 @@ const savedRoutes = require('./routes/savedRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const aiRoutes = require('./routes/aiRoutes');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -59,6 +60,7 @@ app.use('/api/saved', savedRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

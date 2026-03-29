@@ -56,7 +56,7 @@ const requestAgreement = async (req, res, next) => {
 
     // Find published property
     const property = await Property.scope(null).findOne({
-      where: { id: propertyId, isPublished: true, isDeleted: false },
+      where: { id: propertyId, isPublished: true },
     });
 
     if (!property) {
@@ -99,8 +99,8 @@ const requestAgreement = async (req, res, next) => {
       terms,
       startDate,
       endDate,
-      monthlyRent,
-      salePrice,
+      monthlyRent: monthlyRent || (agreementType === 'rental' ? property.price : null),
+      salePrice: salePrice || (agreementType === 'sale' ? property.price : null),
     });
 
     // Fetch with associations
@@ -109,16 +109,18 @@ const requestAgreement = async (req, res, next) => {
         {
           model: Property,
           as: "property",
-          attributes: [
-            "id",
-            "title",
-            "address",
-            "propertyType",
-            "listingType",
-            "price",
-          ],
+          attributes: ["id", "title", "address", "propertyType", "listingType", "price"],
         },
       ],
+    });
+
+    // Record initial request in negotiation history
+    await NegotiationHistory.create({
+      agreementId: agreement.id,
+      actorType: "buyer",
+      actionType: "initial_request",
+      price: agreement.salePrice || agreement.monthlyRent,
+      notes: terms,
     });
 
     res.status(201).json({

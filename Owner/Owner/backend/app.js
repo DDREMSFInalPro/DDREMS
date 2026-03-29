@@ -15,6 +15,7 @@ const agreementRoutes = require('./routes/agreementRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const documentRoutes = require('./routes/documentRoutes');
+const walletRoutes = require('./routes/walletRoutes');
 
 // Import middleware
 const authenticate = require('./middleware/auth');
@@ -60,6 +61,7 @@ app.use('/api/agreements', agreementRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/wallet', walletRoutes);
 
 // AI Price Recommendation (protected, owner only)
 app.get('/api/price-recommendation', authenticate, roleCheck('owner'), getAIPrice);

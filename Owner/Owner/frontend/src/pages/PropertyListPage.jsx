@@ -228,17 +228,26 @@ const PropertyListPage = () => {
                       </td>
                       <td>ETB {Number(property.price).toLocaleString()}</td>
                       <td>
-                        <span className={`badge badge--${property.status === 'active' ? 'success' : property.status === 'sold' ? 'purple' : 'warning'}`}>
-                          {property.status}
+                        <span className={`badge badge--${
+                          property.status === 'active' ? 'success' :
+                          property.status === 'pending_approval' ? 'warning' :
+                          property.status === 'sold' ? 'danger' :
+                          property.status === 'rented' ? 'danger' : 'default'
+                        }`}>
+                          {property.status === 'pending_approval' ? '⏳ Pending Approval' : property.status}
                         </span>
                       </td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <button
                           className={`toggle-btn ${property.isPublished ? 'toggle-btn--on' : 'toggle-btn--off'}`}
                           onClick={() => handleTogglePublish(property.id)}
-                          title={['sold','rented'].includes(property.status) ? `Property is ${property.status}` : property.isPublished ? 'Unpublish' : 'Publish'}
-                          disabled={['sold','rented'].includes(property.status)}
-                          style={['sold','rented'].includes(property.status) ? { opacity: 0.4, cursor: 'not-allowed' } : {}}
+                          title={
+                            ['sold','rented'].includes(property.status) ? `Property is ${property.status}` :
+                            property.status === 'pending_approval' ? 'Awaiting admin approval' :
+                            property.isPublished ? 'Unpublish' : 'Submit for Approval'
+                          }
+                          disabled={['sold','rented','pending_approval'].includes(property.status)}
+                          style={['sold','rented','pending_approval'].includes(property.status) ? { opacity: 0.4, cursor: 'not-allowed' } : {}}
                           id={`btn-toggle-${property.id}`}
                         >
                           <span className="toggle-btn__slider"></span>

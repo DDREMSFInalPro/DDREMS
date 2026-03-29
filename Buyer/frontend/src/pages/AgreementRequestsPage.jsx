@@ -44,6 +44,9 @@ const AgreementRequestsPage = () => {
       buyer_counter_offer: "badge--warning",
       owner_approved: "badge--success",
       owner_rejected: "badge--danger",
+      payment_submitted: "badge--warning",
+      payment_confirmed: "badge--success",
+      payment_verified: "badge--success",
       completed: "badge--info",
     };
     return `badge ${map[status] || "badge--default"}`;
@@ -58,8 +61,11 @@ const AgreementRequestsPage = () => {
       buyer_accepted_counter: "Counter-Offer Accepted",
       buyer_rejected_counter: "Counter-Offer Rejected",
       buyer_counter_offer: "Your Counter-Offer Sent",
-      owner_approved: "Approved",
+      owner_approved: "✅ Approved — Pay Now",
       owner_rejected: "Rejected",
+      payment_submitted: "💳 Payment Submitted",
+      payment_confirmed: "✅ Payment Confirmed",
+      payment_verified: "✅ Payment Verified",
       completed: "Completed",
     };
     return labels[status] || status.replace("_", " ");
@@ -88,7 +94,9 @@ const AgreementRequestsPage = () => {
           <option value="buyer_counter_offer">Your Counter-Offer Sent</option>
           <option value="buyer_accepted_counter">Counter-Offer Accepted</option>
           <option value="buyer_rejected_counter">Counter-Offer Rejected</option>
-          <option value="owner_approved">Approved</option>
+          <option value="owner_approved">✅ Approved — Pay Now</option>
+          <option value="payment_submitted">💳 Payment Submitted</option>
+          <option value="payment_confirmed">Payment Confirmed</option>
           <option value="owner_rejected">Rejected</option>
           <option value="completed">Completed</option>
         </select>
@@ -148,12 +156,22 @@ const AgreementRequestsPage = () => {
                     </td>
                     <td>{new Date(a.createdAt).toLocaleDateString()}</td>
                     <td>
-                      <button
-                        className="btn btn--sm btn--primary"
-                        onClick={() => navigate(`/agreements/${a.id}`)}
-                      >
-                        👁 View Details
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button
+                          className="btn btn--sm btn--primary"
+                          onClick={() => navigate(`/agreements/${a.id}`)}
+                        >
+                          👁 View Details
+                        </button>
+                        {a.status === 'owner_approved' && (
+                          <button
+                            className="btn btn--sm btn--success"
+                            onClick={() => navigate(`/agreements/${a.id}`)}
+                          >
+                            💳 Pay Now
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

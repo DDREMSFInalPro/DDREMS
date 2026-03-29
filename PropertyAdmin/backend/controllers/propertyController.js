@@ -92,18 +92,16 @@ const togglePublish = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Property not found.' });
     }
 
-    property.isPublished = !property.isPublished;
-    if (property.isPublished && property.status === 'draft') {
-      property.status = 'published';
-    } else if (!property.isPublished && property.status === 'published') {
-      property.status = 'draft';
-    }
-    await property.save();
+    const newPublished = !property.isPublished;
+    await property.update({
+      isPublished: newPublished,
+      status: newPublished ? 'active' : 'draft',
+    });
 
     res.json({
       success: true,
-      message: `Property ${property.isPublished ? 'published' : 'unpublished'} successfully.`,
-      data: { id: property.id, isPublished: property.isPublished, status: property.status },
+      message: `Property ${newPublished ? 'approved & published' : 'unpublished'} successfully.`,
+      data: { id: property.id, isPublished: newPublished, status: newPublished ? 'active' : 'draft' },
     });
   } catch (error) {
     next(error);

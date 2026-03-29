@@ -18,7 +18,15 @@ export const AuthProvider = ({ children }) => {
     const savedToken = localStorage.getItem('ddrems_admin_token');
     const savedUser = localStorage.getItem('ddrems_admin_user');
     if (savedToken && savedUser) {
-      try { setToken(savedToken); setUser(JSON.parse(savedUser)); } catch { localStorage.removeItem('ddrems_admin_token'); localStorage.removeItem('ddrems_admin_user'); }
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        if (parsedUser.role !== 'admin') {
+          localStorage.removeItem('ddrems_admin_token');
+          localStorage.removeItem('ddrems_admin_user');
+        } else {
+          setToken(savedToken); setUser(parsedUser);
+        }
+      } catch { localStorage.removeItem('ddrems_admin_token'); localStorage.removeItem('ddrems_admin_user'); }
     }
     setLoading(false);
   }, []);

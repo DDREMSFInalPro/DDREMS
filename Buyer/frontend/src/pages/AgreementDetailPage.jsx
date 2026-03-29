@@ -13,6 +13,7 @@ const AgreementDetailPage = () => {
   const [counterPrice, setCounterPrice] = useState("");
   const [counterNotes, setCounterNotes] = useState("");
   const [paymentModal, setPaymentModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("chapa"); // "chapa" | "manual"
   const [paymentForm, setPaymentForm] = useState({ gateway: "", transactionId: "", amount: "", notes: "" });
   const [receiptFile, setReceiptFile] = useState(null);
   const [existingPayment, setExistingPayment] = useState(null);
@@ -25,16 +26,25 @@ const AgreementDetailPage = () => {
     setLoading(true);
     try {
       const res = await agreementAPI.getById(id);
-      const agr = res.data.data.agreement;
+      const agr = res.data.data?.agreement || res.data.data;
+      if (!agr) throw new Error("Agreement data not found in response");
       setAgreement(agr);
       // Fetch existing payment if applicable
       if (['owner_approved','payment_submitted','payment_confirmed','payment_verified','completed'].includes(agr.status)) {
         try {
           const pr = await paymentAPI.getByAgreement(id);
-          setExistingPayment(pr.data.data);
-        } catch (_) {}
+          setExistingPayment(pr.data.data || null);
+        } catch (_) {
+          setExistingPayment(null);
+        }
+      }
+      // Redirect to payments page after owner confirms
+      if (agr.status === 'payment_confirmed') {
+        navigate('/payments', { state: { message: '✅ Owner confirmed your payment! Your transaction is now being verified by admin.' } });
+        return;
       }
     } catch (err) {
+      console.error("Agreement load error:", err);
       alert(`Failed to load agreement details: ${err.response?.data?.message || err.message}`);
       navigate("/agreements");
     } finally {
@@ -93,9 +103,26 @@ const AgreementDetailPage = () => {
   };
 
   const handleSubmitPayment = async () => {
-    const { gateway, transactionId, amount } = paymentForm;
-    if (!gateway || !transactionId || !amount) {
-      alert("Please fill in all required payment fields.");
+    const amount = agreement.counterOfferPrice ||
+      (agreement.agreementType === 'rental' ? agreement.monthlyRent : agreement.salePrice) ||
+      agreement.property?.price;
+
+    if (paymentMethod === "chapa") {
+      setActionLoading(true);
+      try {
+        const res = await paymentAPI.initializeChapa({ agreementId: id, amount });
+        window.location.href = res.data.data.checkoutUrl;
+      } catch (err) {
+        alert(err.response?.data?.message || "Failed to initialize Chapa payment.");
+        setActionLoading(false);
+      }
+      return;
+    }
+
+    // Manual payment
+    const { gateway, transactionId } = paymentForm;
+    if (!gateway || !transactionId) {
+      alert("Please select a bank and enter the transaction ID.");
       return;
     }
     setActionLoading(true);
@@ -249,23 +276,32 @@ const AgreementDetailPage = () => {
       </div>
 
       {/* Payment Section */}
-      {agreement.status === "owner_approved" && !existingPayment && (
+      {(agreement.status === "owner_approved" || agreement.status === "buyer_accepted_counter") && !existingPayment && (
         <div className="card" style={{ marginTop: "1rem", border: "2px solid #f59e0b" }}>
           <div className="card__header" style={{ background: "#fffbeb" }}>
             <h3>💳 Payment Required</h3>
           </div>
           <div className="card__body">
-            <p>The owner has approved your agreement. Please submit your payment to proceed.</p>
-            <p><strong>Amount Due: ETB {Number(agreement.counterOfferPrice || agreement.salePrice || agreement.monthlyRent).toLocaleString()}</strong></p>
-            <div style={{ marginTop: "1rem" }}>
-              <p style={{ marginBottom: "0.5rem", fontWeight: 600 }}>Accepted Payment Methods:</p>
-              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginBottom: "1rem" }}>
-                {["Chapa", "CBE", "Abyssinia"].map((gw) => (
-                  <span key={gw} style={{ padding: "0.4rem 1rem", border: "1px solid #d1d5db", borderRadius: "6px", background: "#f9fafb", fontWeight: 500 }}>{gw}</span>
-                ))}
-              </div>
-              <button className="btn btn--primary" onClick={() => setPaymentModal(true)}>💳 Submit Payment</button>
+            <p style={{ marginBottom: "0.75rem" }}>
+              ✅ <strong>The owner has approved your agreement.</strong> Please submit your payment to proceed.
+            </p>
+            <p style={{ fontSize: "1.1rem", fontWeight: 700, color: "#10b981", marginBottom: "1rem" }}>
+              Amount Due: ETB {Number(
+                agreement.counterOfferPrice ||
+                (agreement.agreementType === 'rental' ? agreement.monthlyRent : agreement.salePrice) ||
+                agreement.property?.price || 0
+              ).toLocaleString()}
+              {agreement.agreementType === 'rental' && <span style={{ color: '#6b7280', fontSize: '0.85rem', fontWeight: 400 }}> /month</span>}
+            </p>
+            <p style={{ marginBottom: "0.5rem", fontWeight: 600 }}>Accepted Payment Methods:</p>
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginBottom: "1.25rem" }}>
+              {["🟢 Chapa", "🏦 CBE", "🏦 Abyssinia", "🏦 Awash"].map((gw) => (
+                <span key={gw} style={{ padding: "0.4rem 1rem", border: "1px solid #d1d5db", borderRadius: "6px", background: "#f9fafb", fontWeight: 500 }}>{gw}</span>
+              ))}
             </div>
+            <button className="btn btn--primary" style={{ fontSize: "1rem", padding: "0.75rem 2rem" }} onClick={() => setPaymentModal(true)}>
+              💳 Submit Payment
+            </button>
           </div>
         </div>
       )}
@@ -411,36 +447,86 @@ const AgreementDetailPage = () => {
               <button className="modal__close" onClick={() => setPaymentModal(false)}>✕</button>
             </div>
             <div className="modal__body">
+              <p style={{ marginBottom: "1rem" }}>
+                <strong>Amount Due: ETB {Number(
+                  agreement.counterOfferPrice ||
+                  (agreement.agreementType === 'rental' ? agreement.monthlyRent : agreement.salePrice) ||
+                  agreement.property?.price
+                ).toLocaleString()}</strong>
+                {agreement.agreementType === 'rental' && <span style={{ color: '#6b7280', fontSize: '0.85rem' }}> /month</span>}
+              </p>
+
+              {/* Payment method selector */}
               <div className="form-group">
-                <label>Payment Method *</label>
-                <select value={paymentForm.gateway} onChange={(e) => setPaymentForm({ ...paymentForm, gateway: e.target.value })}>
-                  <option value="">Select payment method</option>
-                  <option value="Chapa">Chapa</option>
-                  <option value="CBE">CBE (Commercial Bank of Ethiopia)</option>
-                  <option value="Abyssinia">Bank of Abyssinia</option>
-                </select>
+                <label>Payment Method</label>
+                <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("chapa")}
+                    style={{
+                      flex: 1, padding: "0.75rem", border: `2px solid ${paymentMethod === "chapa" ? "#6366f1" : "#e2e8f0"}`,
+                      borderRadius: "8px", background: paymentMethod === "chapa" ? "#eef2ff" : "#fff",
+                      cursor: "pointer", fontWeight: 600,
+                    }}
+                  >
+                    🟢 Chapa (Telebirr, CBE, Cards)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("manual")}
+                    style={{
+                      flex: 1, padding: "0.75rem", border: `2px solid ${paymentMethod === "manual" ? "#6366f1" : "#e2e8f0"}`,
+                      borderRadius: "8px", background: paymentMethod === "manual" ? "#eef2ff" : "#fff",
+                      cursor: "pointer", fontWeight: 600,
+                    }}
+                  >
+                    🏦 Manual Bank Transfer
+                  </button>
+                </div>
               </div>
-              <div className="form-group">
-                <label>Transaction ID *</label>
-                <input type="text" value={paymentForm.transactionId} onChange={(e) => setPaymentForm({ ...paymentForm, transactionId: e.target.value })} placeholder="Enter transaction/reference ID from your bank" />
-              </div>
-              <div className="form-group">
-                <label>Amount Paid (ETB) *</label>
-                <input type="number" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} placeholder="Enter amount paid" min="0" />
-              </div>
-              <div className="form-group">
-                <label>Upload Receipt (optional)</label>
-                <input type="file" accept="image/*,.pdf" onChange={(e) => setReceiptFile(e.target.files[0])} />
-              </div>
-              <div className="form-group">
-                <label>Notes (optional)</label>
-                <textarea value={paymentForm.notes} onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} rows={2} placeholder="Any additional notes..." />
-              </div>
+
+              {paymentMethod === "chapa" && (
+                <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", padding: "1rem", marginTop: "1rem" }}>
+                  <p style={{ fontWeight: 600, marginBottom: "0.5rem" }}>✅ Pay securely via Chapa</p>
+                  <p style={{ fontSize: "0.875rem", color: "#64748b" }}>
+                    Supports: Telebirr, CBE Birr, Amole, HelloCash, Debit/Credit Cards
+                  </p>
+                  <p style={{ fontSize: "0.875rem", color: "#64748b", marginTop: "0.25rem" }}>
+                    You will be redirected to Chapa's secure checkout page.
+                  </p>
+                </div>
+              )}
+
+              {paymentMethod === "manual" && (
+                <>
+                  <div className="form-group" style={{ marginTop: "1rem" }}>
+                    <label>Bank / Gateway *</label>
+                    <select value={paymentForm.gateway} onChange={(e) => setPaymentForm({ ...paymentForm, gateway: e.target.value })}>
+                      <option value="">Select bank</option>
+                      <option value="CBE">CBE (Commercial Bank of Ethiopia)</option>
+                      <option value="Abyssinia">Bank of Abyssinia</option>
+                      <option value="Awash">Awash Bank</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Transaction ID *</label>
+                    <input type="text" value={paymentForm.transactionId} onChange={(e) => setPaymentForm({ ...paymentForm, transactionId: e.target.value })} placeholder="Enter transaction/reference ID from your bank" />
+                  </div>
+                  <div className="form-group">
+                    <label>Upload Receipt (optional)</label>
+                    <input type="file" accept="image/*,.pdf" onChange={(e) => setReceiptFile(e.target.files[0])} />
+                  </div>
+                  <div className="form-group">
+                    <label>Notes (optional)</label>
+                    <textarea value={paymentForm.notes} onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} rows={2} placeholder="Any additional notes..." />
+                  </div>
+                </>
+              )}
             </div>
             <div className="modal__footer">
               <button className="btn btn--outline" onClick={() => setPaymentModal(false)}>Cancel</button>
               <button className="btn btn--primary" onClick={handleSubmitPayment} disabled={actionLoading}>
-                {actionLoading ? "⏳ Submitting..." : "💳 Submit Payment"}
+                {actionLoading ? "⏳ Processing..." : paymentMethod === "chapa" ? "🟢 Pay with Chapa" : "💳 Submit Payment"}
               </button>
             </div>
           </div>

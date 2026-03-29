@@ -47,7 +47,12 @@ const PropertyManagementPage = () => {
           <option value="">All Types</option><option value="apartment">Apartment</option><option value="house">House</option><option value="villa">Villa</option><option value="commercial">Commercial</option><option value="land">Land</option>
         </select>
         <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value, page: 1 })} id="select-status">
-          <option value="">All Status</option><option value="draft">Draft</option><option value="published">Published</option><option value="sold">Sold</option><option value="rented">Rented</option>
+          <option value="">All Status</option>
+          <option value="pending_approval">⏳ Pending Approval</option>
+          <option value="draft">Draft</option>
+          <option value="active">Active</option>
+          <option value="sold">Sold</option>
+          <option value="rented">Rented</option>
         </select>
       </div>
 
@@ -65,9 +70,19 @@ const PropertyManagementPage = () => {
                 <td>{p.owner?.name || 'N/A'}<br /><small>{p.owner?.email}</small></td>
                 <td className="capitalize">{p.propertyType}</td>
                 <td>ETB {Number(p.price).toLocaleString()}</td>
-                <td><span className={`badge badge--${p.status === 'published' ? 'success' : p.status === 'draft' ? 'warning' : 'info'}`}>{p.status}</span></td>
+                <td><span className={`badge badge--${
+                  p.status === 'active' ? 'success' :
+                  p.status === 'pending_approval' ? 'warning' :
+                  p.status === 'draft' ? 'default' : 'info'
+                }`}>{p.status === 'pending_approval' ? '⏳ Pending Approval' : p.status}</span></td>
                 <td><span className={`badge ${p.isPublished ? 'badge--success' : 'badge--danger'}`}>{p.isPublished ? 'Yes' : 'No'}</span></td>
-                <td><button className={`btn btn--sm ${p.isPublished ? 'btn--danger' : 'btn--primary'}`} onClick={() => togglePublish(p.id)}>{p.isPublished ? 'Unpublish' : 'Publish'}</button></td>
+                <td>
+                  {p.status === 'pending_approval' ? (
+                    <button className="btn btn--sm btn--success" onClick={() => togglePublish(p.id)}>✅ Approve & Publish</button>
+                  ) : (
+                    <button className={`btn btn--sm ${p.isPublished ? 'btn--danger' : 'btn--primary'}`} onClick={() => togglePublish(p.id)}>{p.isPublished ? 'Unpublish' : 'Publish'}</button>
+                  )}
+                </td>
               </tr>
             ))}</tbody></table></div>
           {pagination.totalPages > 1 && (

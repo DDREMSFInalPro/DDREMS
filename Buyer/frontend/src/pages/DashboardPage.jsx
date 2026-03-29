@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardAPI } from '../services/api';
+import Recommendations from '../components/Recommendations';
 
 const DashboardPage = () => {
   const [data, setData] = useState(null);
@@ -27,7 +28,7 @@ const DashboardPage = () => {
 
   if (loading) return <div className="loading-screen"><div className="spinner"></div><p>Loading dashboard...</p></div>;
 
-  const { summary, recentAgreements } = data || {};
+  const { summary, recentAgreements, recentSaved, recentPayments } = data || {};
 
   const statusBadge = (status) => {
     const map = {
@@ -138,6 +139,83 @@ const DashboardPage = () => {
           </div>
         </div>
       </div>
+      {/* Recent Saved Properties */}
+      {recentSaved?.length > 0 && (
+        <div className="card" style={{ marginTop: '1.5rem' }}>
+          <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3>❤️ Recently Saved Properties</h3>
+            <button className="btn btn--sm btn--outline" onClick={() => navigate('/saved')}>View All</button>
+          </div>
+          <div className="card__body">
+            <div className="property-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
+              {recentSaved.map((item) => {
+                const p = item.property;
+                if (!p) return null;
+                const img = p.images?.find(i => i.isPrimary) || p.images?.[0];
+                return (
+                  <div key={item.id} className="property-card" onClick={() => navigate(`/browse/${p.id}`)} style={{ cursor: 'pointer' }}>
+                    <div className="property-card__image">
+                      {img ? <img src={img.imageUrl} alt={p.title} /> : <div className="property-card__placeholder">🏠</div>}
+                      <span className={`property-card__badge property-card__badge--${p.listingType}`}>
+                        For {p.listingType === 'sale' ? 'Sale' : 'Rent'}
+                      </span>
+                      <span style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', fontSize: '1.2rem' }}>❤️</span>
+                    </div>
+                    <div className="property-card__body">
+                      <h3 className="property-card__title">{p.title}</h3>
+                      <p className="property-card__address">📍 {p.address}</p>
+                      <div className="property-card__price">ETB {Number(p.price).toLocaleString()}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Recommendations */}
+      <Recommendations price={2500000} bedrooms={3} location="AddisAbaba" />
+
+      {/* Recent Payments */}
+      {recentPayments?.length > 0 && (
+        <div className="card" style={{ marginTop: '1.5rem' }}>
+          <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3>💰 Recent Payments</h3>
+            <button className="btn btn--sm btn--outline" onClick={() => navigate('/payments')}>View All</button>
+          </div>
+          <div className="card__body">
+            <div className="table-responsive">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Property</th>
+                    <th>Amount</th>
+                    <th>Method</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentPayments.map((pay) => (
+                    <tr key={pay.id}>
+                      <td>{pay.property?.title || 'N/A'}</td>
+                      <td><strong>ETB {Number(pay.amount).toLocaleString()}</strong></td>
+                      <td>{pay.paymentGateway || pay.paymentMethod}</td>
+                      <td>
+                        <span className={`badge badge--${pay.paymentStatus === 'completed' ? 'success' : 'warning'}`}>
+                          {pay.paymentStatus}
+                        </span>
+                      </td>
+                      <td>{new Date(pay.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

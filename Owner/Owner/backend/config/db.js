@@ -6,7 +6,7 @@ const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
 const sequelize = new Sequelize(
-  process.env.DB_NAME || 'ddrems',
+  process.env.DB_NAME || 'DDREMSDB',
   process.env.DB_USER || 'postgres',
   process.env.DB_PASSWORD || '',
   {

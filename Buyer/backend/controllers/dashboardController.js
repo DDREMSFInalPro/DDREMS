@@ -2,7 +2,7 @@
  * Dashboard Controller (Buyer Module)
  * Provides summary statistics for the buyer's dashboard
  */
-const { Property, Payment, Agreement, SavedProperty } = require('../models');
+const { Property, Payment, Agreement, SavedProperty, PropertyImage } = require('../models');
 
 /**
  * Get dashboard summary for the authenticated buyer
@@ -39,9 +39,9 @@ const getDashboard = async (req, res, next) => {
       where: { payerId: buyerId },
     });
 
-    // Total available properties (published)
-    const totalAvailableProperties = await Property.scope(null).count({
-      where: { isPublished: true, isDeleted: false },
+    // Total available properties (published, not deleted)
+    const totalAvailableProperties = await Property.count({
+      where: { isPublished: true },
     });
 
     // Recent agreement requests (last 5)
@@ -53,6 +53,31 @@ const getDashboard = async (req, res, next) => {
           as: 'property',
           attributes: ['id', 'title', 'price', 'propertyType'],
         },
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: 5,
+    });
+
+    // Recent saved properties (last 4)
+    const recentSaved = await SavedProperty.findAll({
+      where: { buyerId },
+      include: [
+        {
+          model: Property,
+          as: 'property',
+          attributes: ['id', 'title', 'price', 'propertyType', 'listingType', 'address'],
+          include: [{ model: PropertyImage, as: 'images', attributes: ['imageUrl', 'isPrimary'] }],
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: 4,
+    });
+
+    // Recent payments (last 5)
+    const recentPayments = await Payment.findAll({
+      where: { payerId: buyerId },
+      include: [
+        { model: Property, as: 'property', attributes: ['id', 'title'] },
       ],
       order: [['createdAt', 'DESC']],
       limit: 5,
@@ -71,6 +96,8 @@ const getDashboard = async (req, res, next) => {
           totalAvailableProperties,
         },
         recentAgreements,
+        recentSaved,
+        recentPayments,
       },
     });
   } catch (error) {

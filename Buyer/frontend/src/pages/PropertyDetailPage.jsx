@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { propertyAPI, agreementAPI, savedAPI } from '../services/api';
+import api from '../services/api';
 
 const PropertyDetailPage = () => {
   const { id } = useParams();
@@ -24,6 +25,7 @@ const PropertyDetailPage = () => {
   });
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [aiVerdict, setAiVerdict] = useState(null);
 
   useEffect(() => {
     fetchProperty();
@@ -37,6 +39,11 @@ const PropertyDetailPage = () => {
       if (res.data.data.listingType) {
         setRequestForm((prev) => ({ ...prev, agreementType: res.data.data.listingType === 'rent' ? 'rental' : 'sale' }));
       }
+      // Fetch AI verdict in background
+      try {
+        const aiRes = await api.get(`/ai/recommend/${id}`);
+        setAiVerdict(aiRes.data.data);
+      } catch (_) {}
     } catch (err) {
       console.error('Failed to load property:', err);
     } finally {
@@ -86,9 +93,9 @@ const PropertyDetailPage = () => {
       };
 
       if (requestForm.agreementType === 'rental') {
-        data.monthlyRent = requestForm.monthlyRent ? parseFloat(requestForm.monthlyRent) : undefined;
+        data.monthlyRent = requestForm.monthlyRent ? parseFloat(requestForm.monthlyRent) : parseFloat(property.price);
       } else {
-        data.salePrice = requestForm.salePrice ? parseFloat(requestForm.salePrice) : undefined;
+        data.salePrice = requestForm.salePrice ? parseFloat(requestForm.salePrice) : parseFloat(property.price);
       }
 
       await agreementAPI.request(data);
@@ -169,6 +176,19 @@ const PropertyDetailPage = () => {
               For {property.listingType === 'sale' ? 'Sale' : 'Rent'}
             </span>
           </div>
+
+          {/* AI Verdict Badge */}
+          {aiVerdict && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '0.75rem 0', padding: '0.75rem 1rem', borderRadius: '10px', background: '#f9fafb', border: '1px solid #e5e7eb' }}>
+              <span style={{ fontSize: '1.1rem' }}>🤖</span>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontWeight: 700, color: aiVerdict.verdict.color, marginRight: '0.5rem' }}>{aiVerdict.verdict.label}</span>
+                <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>{aiVerdict.verdict.message}</span>
+              </div>
+              <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>AI Est: ETB {Number(aiVerdict.recommendedPrice).toLocaleString()}</span>
+              <button className="btn btn--sm btn--outline" onClick={() => navigate('/ai-price')} style={{ whiteSpace: 'nowrap' }}>Full Analysis</button>
+            </div>
+          )}
 
           <div className="property-detail__specs">
             <div className="spec-item"><span className="spec-item__icon">🏠</span><span>{property.propertyType}</span></div>

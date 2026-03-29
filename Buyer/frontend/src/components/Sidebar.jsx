@@ -18,6 +18,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     { path: '/', label: 'Dashboard', icon: '📊' },
     { path: '/browse', label: 'Browse Properties', icon: '🔍' },
     { path: '/saved', label: 'Saved Properties', icon: '❤️' },
+    { path: '/ai-price', label: 'AI Price Advisor', icon: '🤖' },
     { path: '/agreements', label: 'My Agreements', icon: '📄' },
     { path: '/payments', label: 'Payments', icon: '💰' },
     { path: '/profile', label: 'My Profile', icon: '👤' },

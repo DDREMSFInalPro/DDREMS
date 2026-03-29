@@ -14,6 +14,9 @@ const AgreementListPage = () => {
 
   useEffect(() => {
     fetchAgreements();
+    // Poll every 30 seconds for new forwarded agreements
+    const interval = setInterval(fetchAgreements, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchAgreements = async () => {

@@ -345,20 +345,24 @@ const togglePublish = async (req, res, next) => {
       });
     }
 
-    const newStatus = !property.isPublished;
-    await property.update({
-      isPublished: newStatus,
-      status: newStatus ? 'active' : 'draft',
-    });
+    const newPublished = !property.isPublished;
 
+    // Owner publishing sends for admin approval, not directly live
+    if (newPublished) {
+      await property.update({ status: 'pending_approval', isPublished: false });
+      return res.json({
+        success: true,
+        message: 'Property submitted for admin approval. It will be visible to buyers once approved.',
+        data: { id: property.id, isPublished: false, status: 'pending_approval' },
+      });
+    }
+
+    // Unpublish
+    await property.update({ isPublished: false, status: 'draft' });
     res.json({
       success: true,
-      message: newStatus ? 'Property published successfully.' : 'Property unpublished.',
-      data: {
-        id: property.id,
-        isPublished: newStatus,
-        status: newStatus ? 'active' : 'draft',
-      },
+      message: 'Property unpublished.',
+      data: { id: property.id, isPublished: false, status: 'draft' },
     });
   } catch (error) {
     next(error);

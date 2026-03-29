@@ -6,6 +6,7 @@ import { useAuth } from "./context/AuthContext";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LoginPage from "./pages/LoginPage";
+import LandingPage from "./pages/LandingPage";
 import DashboardPage from "./pages/DashboardPage";
 import BrowsePropertiesPage from "./pages/BrowsePropertiesPage";
 import PropertyDetailPage from "./pages/PropertyDetailPage";
@@ -14,12 +15,19 @@ import AgreementDetailPage from "./pages/AgreementDetailPage";
 import SavedPropertiesPage from "./pages/SavedPropertiesPage";
 import PaymentsPage from "./pages/PaymentsPage";
 import ProfilePage from "./pages/ProfilePage";
+import AIPricePage from "./pages/AIPricePage";
 
 const App = () => {
   const { isAuthenticated } = useAuth();
 
   return (
     <Routes>
+      {/* Landing page */}
+      <Route
+        path="/landing"
+        element={<LandingPage />}
+      />
+
       {/* Public route */}
       <Route
         path="/login"
@@ -42,10 +50,10 @@ const App = () => {
         <Route path="agreements/:id" element={<AgreementDetailPage />} />
         <Route path="payments" element={<PaymentsPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="ai-price" element={<AIPricePage />} />
       </Route>
 
-      {/* Catch-all redirect */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/landing" replace />} />
     </Routes>
   );
 };

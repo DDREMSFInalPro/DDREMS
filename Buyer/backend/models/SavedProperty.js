@@ -14,7 +14,7 @@ const SavedProperty = sequelize.define('SavedProperty', {
   buyerId: {
     type: DataTypes.UUID,
     allowNull: false,
-    field: 'buyer_id',
+    field: 'user_id',
     references: { model: 'users', key: 'id' },
   },
   propertyId: {
@@ -31,7 +31,7 @@ const SavedProperty = sequelize.define('SavedProperty', {
   indexes: [
     {
       unique: true,
-      fields: ['buyer_id', 'property_id'],
+      fields: ['user_id', 'property_id'],
     },
   ],
 });

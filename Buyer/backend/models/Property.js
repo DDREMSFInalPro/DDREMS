@@ -79,7 +79,7 @@ const Property = sequelize.define('Property', {
     field: 'is_deleted',
   },
   status: {
-    type: DataTypes.ENUM('draft', 'active', 'sold', 'rented', 'withdrawn'),
+    type: DataTypes.ENUM('draft', 'active', 'pending_approval', 'sold', 'rented', 'withdrawn'),
     defaultValue: 'draft',
   },
   amenities: {

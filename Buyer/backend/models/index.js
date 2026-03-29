@@ -51,8 +51,8 @@ User.hasMany(Agreement, { foreignKey: "buyer_id", as: "agreementRequests" });
 Agreement.belongsTo(User, { foreignKey: "buyer_id", as: "buyer" });
 
 // User → SavedProperties (one-to-many)
-User.hasMany(SavedProperty, { foreignKey: "buyer_id", as: "savedProperties" });
-SavedProperty.belongsTo(User, { foreignKey: "buyer_id", as: "buyer" });
+User.hasMany(SavedProperty, { foreignKey: "user_id", as: "savedProperties" });
+SavedProperty.belongsTo(User, { foreignKey: "user_id", as: "buyer" });
 
 // Property → SavedProperties (one-to-many)
 Property.hasMany(SavedProperty, { foreignKey: "property_id", as: "savedBy" });

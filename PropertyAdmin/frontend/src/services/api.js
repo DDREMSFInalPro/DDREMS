@@ -64,7 +64,10 @@ export const agreementAPI = {
 };
 
 export const paymentAPI = {
-  getAll: (params) => api.get("/payments", { params }),
+  getAll:           (params) => api.get("/payments", { params }),
+  getCommission:    () => api.get("/payments/commission"),
+  getWithdrawals:   (params) => api.get("/payments/withdrawals", { params }),
+  updateWithdrawal: (id, data) => api.patch(`/payments/withdrawals/${id}`, data),
 };
 
 export const profileAPI = {

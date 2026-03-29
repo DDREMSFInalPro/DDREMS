@@ -20,7 +20,7 @@ const Property = sequelize.define('Property', {
   latitude: { type: DataTypes.DECIMAL(10, 8) },
   longitude: { type: DataTypes.DECIMAL(11, 8) },
   amenities: { type: DataTypes.JSONB, defaultValue: [] },
-  status: { type: DataTypes.ENUM('draft', 'active', 'sold', 'rented', 'withdrawn'), defaultValue: 'draft' },
+  status: { type: DataTypes.ENUM('draft', 'active', 'pending_approval', 'sold', 'rented', 'withdrawn'), defaultValue: 'draft' },
   isPublished: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_published' },
 }, {
   tableName: 'properties',

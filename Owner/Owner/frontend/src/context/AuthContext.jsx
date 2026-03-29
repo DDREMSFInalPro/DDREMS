@@ -27,8 +27,15 @@ export const AuthProvider = ({ children }) => {
 
     if (savedToken && savedUser) {
       try {
-        setToken(savedToken);
-        setUser(JSON.parse(savedUser));
+        const parsedUser = JSON.parse(savedUser);
+        // Clear if wrong role for this portal
+        if (parsedUser.role !== 'owner') {
+          localStorage.removeItem('ddrems_token');
+          localStorage.removeItem('ddrems_user');
+        } else {
+          setToken(savedToken);
+          setUser(parsedUser);
+        }
       } catch {
         localStorage.removeItem('ddrems_token');
         localStorage.removeItem('ddrems_user');

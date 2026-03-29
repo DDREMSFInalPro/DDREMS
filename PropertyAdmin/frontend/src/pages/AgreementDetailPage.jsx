@@ -393,13 +393,13 @@ const AgreementDetailPage = () => {
         </div>
         <div className="card__body">
           <div className="action-buttons">
-            {agreement.status === "pending" && (
+            {(agreement.status === "pending" || agreement.status === "forwarded_to_owner") && (
               <button
                 className="btn btn--primary"
                 onClick={handleForwardToOwner}
                 disabled={actionLoading}
               >
-                {actionLoading ? "⏳ Processing..." : "📨 Forward to Owner"}
+                {actionLoading ? "⏳ Processing..." : agreement.status === "forwarded_to_owner" ? "📨 Re-send to Owner" : "📨 Forward to Owner"}
               </button>
             )}
             {agreement.status === "counter_offer" && (
@@ -489,14 +489,10 @@ const AgreementDetailPage = () => {
               </div>
             )}
             {(agreement.status === "counter_offer_sent" ||
-              agreement.status === "forwarded_to_owner" ||
               agreement.status === "buyer_counter_forwarded") && (
               <div className="alert alert--info">
                 Waiting for{" "}
-                {agreement.status === "forwarded_to_owner" ||
-                agreement.status === "buyer_counter_forwarded"
-                  ? "owner"
-                  : "buyer"}{" "}
+                {agreement.status === "buyer_counter_forwarded" ? "owner" : "buyer"}{" "}
                 response...
               </div>
             )}

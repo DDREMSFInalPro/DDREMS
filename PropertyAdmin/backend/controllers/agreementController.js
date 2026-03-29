@@ -342,7 +342,7 @@ const forwardToOwner = async (req, res, next) => {
         .json({ success: false, message: "Agreement not found." });
     }
 
-    if (agreement.status !== "pending") {
+    if (!['pending', 'forwarded_to_owner'].includes(agreement.status)) {
       return res.status(400).json({
         success: false,
         message: "Only pending agreements can be forwarded to the owner.",

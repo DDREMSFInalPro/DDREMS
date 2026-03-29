@@ -27,8 +27,14 @@ export const AuthProvider = ({ children }) => {
 
     if (savedToken && savedUser) {
       try {
-        setToken(savedToken);
-        setUser(JSON.parse(savedUser));
+        const parsedUser = JSON.parse(savedUser);
+        if (parsedUser.role !== 'buyer') {
+          localStorage.removeItem('ddrems_buyer_token');
+          localStorage.removeItem('ddrems_buyer_user');
+        } else {
+          setToken(savedToken);
+          setUser(parsedUser);
+        }
       } catch {
         localStorage.removeItem('ddrems_buyer_token');
         localStorage.removeItem('ddrems_buyer_user');

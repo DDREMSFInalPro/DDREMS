@@ -92,6 +92,29 @@ const Payment = sequelize.define('Payment', {
     type: DataTypes.DATE,
     field: 'paid_at',
   },
+  commissionAmount: {
+    type: DataTypes.DECIMAL(15, 2),
+    defaultValue: 0,
+    field: 'commission_amount',
+  },
+  ownerNetAmount: {
+    type: DataTypes.DECIMAL(15, 2),
+    defaultValue: 0,
+    field: 'owner_net_amount',
+  },
+  commissionRate: {
+    type: DataTypes.DECIMAL(5, 2),
+    defaultValue: 15.00,
+    field: 'commission_rate',
+  },
+  chapaTxRef: {
+    type: DataTypes.STRING(200),
+    field: 'chapa_tx_ref',
+  },
+  chapaCheckoutUrl: {
+    type: DataTypes.TEXT,
+    field: 'chapa_checkout_url',
+  },
 }, {
   tableName: 'payments',
   timestamps: true,

@@ -75,6 +75,13 @@ export const paymentAPI = {
   getByAgreement: (agreementId) => api.get(`/payments/agreement/${agreementId}`),
 };
 
+export const walletAPI = {
+  get:             () => api.get('/wallet'),
+  getTransactions: (params) => api.get('/wallet/transactions', { params }),
+  withdraw:        (data) => api.post('/wallet/withdraw', data),
+  getWithdrawals:  () => api.get('/wallet/withdrawals'),
+};
+
 // ==========================================
 // Agreement API
 // ==========================================

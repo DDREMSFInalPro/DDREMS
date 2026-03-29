@@ -87,6 +87,14 @@ export const paymentAPI = {
   getAll: (params) => api.get("/payments", { params }),
   submit: (formData) => api.post("/payments/submit", formData, { headers: { "Content-Type": "multipart/form-data" } }),
   getByAgreement: (agreementId) => api.get(`/payments/agreement/${agreementId}`),
+  initializeChapa: (data) => api.post("/payments/chapa/initialize", data),
+  verifyChapaReturn: (txRef) => api.get(`/payments/chapa/verify/${txRef}`),
+};
+
+export const aiAPI = {
+  recommend:        (data) => api.post("/ai/recommend", data),
+  getVerdict:       (propertyId) => api.get(`/ai/recommend/${propertyId}`),
+  getProperties:    (data) => api.post("/ai/properties", data),  // KNN recommendations
 };
 
 // ==========================================

@@ -3,6 +3,7 @@
  * Payment history table
  */
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { paymentAPI } from '../services/api';
 
 const PaymentsPage = () => {
@@ -10,6 +11,8 @@ const PaymentsPage = () => {
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({});
   const [page, setPage] = useState(1);
+  const location = useLocation();
+  const successMessage = location.state?.message;
 
   useEffect(() => {
     fetchPayments();
@@ -44,6 +47,12 @@ const PaymentsPage = () => {
         <h1>My Payments</h1>
         <p>View your payment history</p>
       </div>
+
+      {successMessage && (
+        <div className="alert alert--success" style={{ marginBottom: '1.5rem', padding: '1rem 1.25rem', borderRadius: '10px', background: '#d1fae5', color: '#065f46', fontWeight: 500 }}>
+          {successMessage}
+        </div>
+      )}
 
       {loading ? (
         <div className="loading-screen"><div className="spinner"></div><p>Loading payments...</p></div>

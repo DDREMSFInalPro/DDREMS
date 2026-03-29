@@ -14,8 +14,8 @@ const saveProperty = async (req, res, next) => {
     const { propertyId } = req.params;
 
     // Verify property exists and is published
-    const property = await Property.scope(null).findOne({
-      where: { id: propertyId, isPublished: true, isDeleted: false },
+    const property = await Property.findOne({
+      where: { id: propertyId, isPublished: true },
     });
 
     if (!property) {
@@ -142,7 +142,6 @@ const getSavedPropertyIds = async (req, res, next) => {
     const saved = await SavedProperty.findAll({
       where: { buyerId },
       attributes: ['propertyId'],
-      raw: true,
     });
 
     const ids = saved.map((s) => s.propertyId);
