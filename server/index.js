@@ -8,9 +8,17 @@ dotenv.config();
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-admin-id']
+}));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
+
+// Health check
+app.get('/', (req, res) => res.json({ status: 'ok', message: 'DDREMS API running' }));
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // Add request logging
 app.use((req, res, next) => {
