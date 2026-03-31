@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'; // Re-compilation trigger
 import './Properties.css';
 import axios from 'axios';
+import API_BASE_URL from '../config/api';
 import PageHeader from './PageHeader';
 import ImageGallery from './shared/ImageGallery';
 import ImageUploader from './shared/ImageUploader';
@@ -53,22 +54,22 @@ const Properties = ({ user, onLogout }) => {
     try {
       if (user?.role === 'user') {
         const [keyRes, agreementRes] = await Promise.all([
-          axios.get(`http://localhost:5000/api/key-requests/customer/${user.id}`),
-          axios.get(`http://localhost:5000/api/agreement-requests/customer/${user.id}`)
+          axios.get(`${API_BASE_URL}/api/key-requests/customer/${user.id}`),
+          axios.get(`${API_BASE_URL}/api/agreement-requests/customer/${user.id}`)
         ]);
         setKeyRequests(keyRes.data);
         setAgreementRequests(agreementRes.data);
       } else if (user?.role === 'owner') {
         const [keyRes, agreementRes] = await Promise.all([
-          axios.get(`http://localhost:5000/api/key-requests/customer/${user.id}`),
-          axios.get(`http://localhost:5000/api/agreements/owner/${user.id}`)
+          axios.get(`${API_BASE_URL}/api/key-requests/customer/${user.id}`),
+          axios.get(`${API_BASE_URL}/api/agreements/owner/${user.id}`)
         ]);
         setKeyRequests(keyRes.data);
         setAgreementRequests(agreementRes.data);
       } else if (user?.role === 'broker') {
         const [keyRes, agreementRes] = await Promise.all([
-          axios.get(`http://localhost:5000/api/key-requests/broker/${user.id}`),
-          axios.get(`http://localhost:5000/api/agreements/broker/${user.id}`)
+          axios.get(`${API_BASE_URL}/api/key-requests/broker/${user.id}`),
+          axios.get(`${API_BASE_URL}/api/agreements/broker/${user.id}`)
         ]);
         setKeyRequests(keyRes.data);
         setAgreementRequests(agreementRes.data);
@@ -81,8 +82,8 @@ const Properties = ({ user, onLogout }) => {
   const fetchProperties = async () => {
     try {
       const endpoint = (user?.role === 'system_admin' || user?.role === 'admin' || user?.role === 'property_admin')
-        ? 'http://localhost:5000/api/properties/all-with-status'
-        : 'http://localhost:5000/api/properties';
+        ? `${API_BASE_URL}/api/properties/all-with-status`
+        : `${API_BASE_URL}/api/properties`;
       const response = await axios.get(endpoint);
       setProperties(response.data);
     } catch (error) {
@@ -94,7 +95,7 @@ const Properties = ({ user, onLogout }) => {
     setSelectedProperty(property);
     setShowViewModal(true);
     try {
-      const response = await axios.get(`http://localhost:5000/api/properties/${property.id}`);
+      const response = await axios.get(`${API_BASE_URL}/api/properties/${property.id}`);
       setPropertyDetail(response.data);
     } catch (error) {
       console.error('Error fetching property details:', error);
@@ -105,7 +106,7 @@ const Properties = ({ user, onLogout }) => {
   const deleteProperty = async (propertyId) => {
     if (!window.confirm('Are you sure you want to delete this property?')) return;
     try {
-      await axios.delete(`http://localhost:5000/api/properties/${propertyId}`);
+      await axios.delete(`${API_BASE_URL}/api/properties/${propertyId}`);
       alert('Property deleted successfully');
       fetchProperties();
     } catch (error) {
@@ -128,7 +129,7 @@ const Properties = ({ user, onLogout }) => {
 
   const requestKey = async (propertyId) => {
     try {
-      await axios.post('http://localhost:5000/api/key-requests', {
+      await axios.post(`${API_BASE_URL}/api/key-requests`, {
         property_id: propertyId,
         customer_id: user.id,
         request_message: 'Requesting access key to view property documents and agreement.'
@@ -143,7 +144,7 @@ const Properties = ({ user, onLogout }) => {
 
   const requestAgreement = async (propertyId) => {
     try {
-      await axios.post('http://localhost:5000/api/agreement-requests', {
+      await axios.post(`${API_BASE_URL}/api/agreement-requests`, {
         property_id: propertyId,
         customer_id: user.id,
         request_message: 'I have reviewed the documents and would like to request an agreement.'
@@ -216,7 +217,7 @@ const Properties = ({ user, onLogout }) => {
   const handleAddProperty = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:5000/api/properties', {
+      const response = await axios.post(`${API_BASE_URL}/api/properties`, {
         ...propertyForm,
         broker_id: user.role === 'broker' ? user.id : 1, // Defaulting to system admin/shared broker if admin adds it
         status: 'pending'
@@ -244,7 +245,7 @@ const Properties = ({ user, onLogout }) => {
 
   const fetchPreviewData = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/property-images/property/${newPropertyId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/property-images/property/${newPropertyId}`);
       setPreviewImages(response.data);
     } catch (error) {
       console.error('Error fetching preview:', error);

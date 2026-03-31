@@ -8,6 +8,7 @@ import AIPriceComparison from './AIPriceComparison';
 import AgreementWorkflow from './AgreementWorkflow';
 import AgreementManagement from './AgreementManagement';
 import axios from 'axios';
+import API_BASE_URL from '../config/api';
 
 const CustomerDashboardEnhanced = ({ user, onLogout, setCurrentPage }) => {
   const [favorites, setFavorites] = useState([]);
@@ -56,12 +57,12 @@ const CustomerDashboardEnhanced = ({ user, onLogout, setCurrentPage }) => {
   const fetchCustomerData = async () => {
     try {
       // Fetch ONLY ACTIVE properties
-      const propertiesRes = await axios.get('http://localhost:5000/api/properties/active');
+      const propertiesRes = await axios.get(`${API_BASE_URL}/api/properties/active`);
       setAllProperties(propertiesRes.data);
 
       // Fetch favorites
       try {
-        const favoritesRes = await axios.get(`http://localhost:5000/api/favorites/${user.id}`);
+        const favoritesRes = await axios.get(`${API_BASE_URL}/api/favorites/${user.id}`);
         setFavorites(favoritesRes.data);
       } catch (error) {
         setFavorites([]);
@@ -69,14 +70,14 @@ const CustomerDashboardEnhanced = ({ user, onLogout, setCurrentPage }) => {
 
       // Fetch recent views
       try {
-        const viewsRes = await axios.get(`http://localhost:5000/api/property-views/user/${user.id}`);
+        const viewsRes = await axios.get(`${API_BASE_URL}/api/property-views/user/${user.id}`);
         setRecentViews(viewsRes.data);
       } catch (error) {
         setRecentViews([]);
       }
 
       try {
-        const messagesRes = await axios.get(`http://localhost:5000/api/messages/user/${user.id}`);
+        const messagesRes = await axios.get(`${API_BASE_URL}/api/messages/user/${user.id}`);
         setMessages(messagesRes.data);
       } catch (error) {
         setMessages([]);
@@ -84,7 +85,7 @@ const CustomerDashboardEnhanced = ({ user, onLogout, setCurrentPage }) => {
 
       // Fetch announcements
       try {
-        const announcementsRes = await axios.get('http://localhost:5000/api/announcements');
+        const announcementsRes = await axios.get(`${API_BASE_URL}/api/announcements`);
         setAnnouncements(announcementsRes.data);
       } catch (error) {
         setAnnouncements([]);
@@ -93,9 +94,9 @@ const CustomerDashboardEnhanced = ({ user, onLogout, setCurrentPage }) => {
       // Fetch Agreement & Key Requests (Dual Tables)
       try {
         const [agreementsRes, keysRes, notificationsRes] = await Promise.all([
-          axios.get(`http://localhost:5000/api/agreement-requests/customer/${user.id}`),
-          axios.get(`http://localhost:5000/api/key-requests/customer/${user.id}`),
-          axios.get(`http://localhost:5000/api/notifications/${user.id}`)
+          axios.get(`${API_BASE_URL}/api/agreement-requests/customer/${user.id}`),
+          axios.get(`${API_BASE_URL}/api/key-requests/customer/${user.id}`),
+          axios.get(`${API_BASE_URL}/api/notifications/${user.id}`)
         ]);
         
         // Backend now returns request_type directly, just combine them
@@ -120,7 +121,7 @@ const CustomerDashboardEnhanced = ({ user, onLogout, setCurrentPage }) => {
 
   const addToFavorites = async (propertyId) => {
     try {
-      await axios.post('http://localhost:5000/api/favorites', {
+      await axios.post(`${API_BASE_URL}/api/favorites`, {
         user_id: user.id,
         property_id: propertyId
       });
@@ -134,7 +135,7 @@ const CustomerDashboardEnhanced = ({ user, onLogout, setCurrentPage }) => {
 
   const removeFavorite = async (propertyId) => {
     try {
-      await axios.delete(`http://localhost:5000/api/favorites/${user.id}/${propertyId}`);
+      await axios.delete(`${API_BASE_URL}/api/favorites/${user.id}/${propertyId}`);
       alert('Removed from favorites');
       fetchCustomerData();
     } catch (error) {
@@ -149,7 +150,7 @@ const CustomerDashboardEnhanced = ({ user, onLogout, setCurrentPage }) => {
 
     // Record property view
     try {
-      await axios.post('http://localhost:5000/api/property-views', {
+      await axios.post(`${API_BASE_URL}/api/property-views`, {
         user_id: user.id,
         property_id: property.id
       });
@@ -166,7 +167,7 @@ const CustomerDashboardEnhanced = ({ user, onLogout, setCurrentPage }) => {
   const submitFeedback = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/feedback', {
+      await axios.post(`${API_BASE_URL}/api/feedback`, {
         user_id: user.id,
         property_id: selectedProperty?.id,
         rating: feedbackForm.rating,
@@ -183,7 +184,7 @@ const CustomerDashboardEnhanced = ({ user, onLogout, setCurrentPage }) => {
 
   const markMessageAsRead = async (messageId) => {
     try {
-      await axios.put(`http://localhost:5000/api/messages/read/${messageId}`);
+      await axios.put(`${API_BASE_URL}/api/messages/read/${messageId}`);
       fetchCustomerData();
     } catch (error) {
       console.error('Error marking message as read:', error);
@@ -203,7 +204,7 @@ const CustomerDashboardEnhanced = ({ user, onLogout, setCurrentPage }) => {
   const handleReply = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/messages', {
+      await axios.post(`${API_BASE_URL}/api/messages`, {
         sender_id: user.id,
         ...replyData
       });
@@ -223,7 +224,7 @@ const CustomerDashboardEnhanced = ({ user, onLogout, setCurrentPage }) => {
 
   const requestKey = async (propertyId) => {
     try {
-      await axios.post('http://localhost:5000/api/key-requests', {
+      await axios.post(`${API_BASE_URL}/api/key-requests`, {
         property_id: propertyId,
         customer_id: user.id,
         request_message: 'Requesting access key to view property documents and agreement.'
@@ -238,7 +239,7 @@ const CustomerDashboardEnhanced = ({ user, onLogout, setCurrentPage }) => {
 
   const requestAgreement = async (propertyId) => {
     try {
-      await axios.post('http://localhost:5000/api/agreement-requests', {
+      await axios.post(`${API_BASE_URL}/api/agreement-requests`, {
         property_id: propertyId,
         customer_id: user.id,
         request_message: 'I have reviewed the documents and would like to request a formal agreement.'

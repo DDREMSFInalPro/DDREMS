@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import API_BASE_URL from '../config/api';
 
 const MessageNotificationWidget = ({ userId, onNavigateToMessages }) => {
   const [unreadMessages, setUnreadMessages] = useState(0);
@@ -19,11 +20,11 @@ const MessageNotificationWidget = ({ userId, onNavigateToMessages }) => {
   const fetchUnreadMessages = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`http://localhost:5000/api/messages/unread/${userId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/messages/unread/${userId}`);
       setUnreadMessages(response.data.count || 0);
       
       // Also fetch recent notifications
-      const notifResponse = await axios.get(`http://localhost:5000/api/messages/notifications/${userId}`);
+      const notifResponse = await axios.get(`${API_BASE_URL}/api/messages/notifications/${userId}`);
       setNotifications(notifResponse.data.notifications || []);
     } catch (error) {
       console.error('Error fetching unread messages:', error);

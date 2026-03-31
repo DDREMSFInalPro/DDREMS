@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './AdminMessagesView.css';
+import API_BASE_URL from '../config/api';
 
 const AdminMessagesView = ({ user, onClose }) => {
   const [view, setView] = useState('conversations'); // conversations, history, thread
@@ -26,7 +27,7 @@ const AdminMessagesView = ({ user, onClose }) => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `http://localhost:5000/api/messages/admin/conversations/${user.id}`
+        `${API_BASE_URL}/api/messages/admin/conversations/${user.id}`
       );
       setConversations(response.data.conversations || []);
     } catch (error) {
@@ -40,7 +41,7 @@ const AdminMessagesView = ({ user, onClose }) => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `http://localhost:5000/api/messages/admin/history/${user.id}`
+        `${API_BASE_URL}/api/messages/admin/history/${user.id}`
       );
       setHistory(response.data.all_messages || []);
     } catch (error) {
@@ -54,7 +55,7 @@ const AdminMessagesView = ({ user, onClose }) => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `http://localhost:5000/api/messages/admin/conversation/${user.id}/${otherUserId}`
+        `${API_BASE_URL}/api/messages/admin/conversation/${user.id}/${otherUserId}`
       );
       setThreadMessages(response.data.messages || []);
       setThreadReplies(response.data.replies || []);
@@ -74,7 +75,7 @@ const AdminMessagesView = ({ user, onClose }) => {
 
     try {
       await axios.post(
-        `http://localhost:5000/api/messages/${messageId}/reply`,
+        `${API_BASE_URL}/api/messages/${messageId}/reply`,
         {
           subject: replySubject,
           message: replyText,

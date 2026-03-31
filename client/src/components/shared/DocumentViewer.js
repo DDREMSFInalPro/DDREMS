@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import './DocumentViewer.css';
 import axios from 'axios';
+import API_BASE_URL from '../config/api';
 
 const DocumentViewer = ({ propertyId, userId }) => {
   const [documents, setDocuments] = useState([]);
@@ -16,7 +17,7 @@ const DocumentViewer = ({ propertyId, userId }) => {
   const fetchDocuments = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`http://localhost:5000/api/property-documents/property/${propertyId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/property-documents/property/${propertyId}`);
       setDocuments(response.data);
     } catch (error) {
       console.error('Error fetching documents:', error);
@@ -27,7 +28,7 @@ const DocumentViewer = ({ propertyId, userId }) => {
 
   const requestAccess = async () => {
     try {
-      await axios.post('http://localhost:5000/api/document-access/request', {
+      await axios.post(`${API_BASE_URL}/api/document-access/request`, {
         property_id: propertyId,
         user_id: userId
       });
@@ -50,7 +51,7 @@ const DocumentViewer = ({ propertyId, userId }) => {
     const normalizedKey = accessKey.trim().toUpperCase();
     setVerifying(true);
     try {
-      const response = await axios.post('http://localhost:5000/api/property-documents/verify-access', {
+      const response = await axios.post(`${API_BASE_URL}/api/property-documents/verify-access`, {
         document_id: selectedDoc.id,
         access_key: normalizedKey
       });
@@ -210,7 +211,7 @@ const DocumentViewer = ({ propertyId, userId }) => {
                 className="btn-secondary"
                 onClick={async () => {
                   try {
-                    const authenticity = await axios.get(`http://localhost:5000/api/property-documents/${selectedDoc.id}/authenticate`);
+                    const authenticity = await axios.get(`${API_BASE_URL}/api/property-documents/${selectedDoc.id}/authenticate`);
                     alert(`🔍 Document authenticity check result: ${authenticity.data.status}.\n${authenticity.data.comments}`);
                   } catch (error) {
                     console.error('Authenticity check failed', error);

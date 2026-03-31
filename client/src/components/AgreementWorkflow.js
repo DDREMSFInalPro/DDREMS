@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './AgreementWorkflow.css';
 import PageHeader from './PageHeader';
+import API_BASE_URL from '../config/api';
 
 const AgreementWorkflow = ({ user, onLogout }) => {
   const [agreements, setAgreements] = useState([]);
@@ -24,11 +25,11 @@ const AgreementWorkflow = ({ user, onLogout }) => {
       let endpoint = '';
       
       if (user.role === 'user') {
-        endpoint = `http://localhost:5000/api/agreement-workflow/user/${user.id}`;
+        endpoint = `${API_BASE_URL}/api/agreement-workflow/user/${user.id}`;
       } else if (user.role === 'property_admin' || user.role === 'system_admin') {
-        endpoint = `http://localhost:5000/api/agreement-workflow/admin/pending`;
+        endpoint = `${API_BASE_URL}/api/agreement-workflow/admin/pending`;
       } else {
-        endpoint = `http://localhost:5000/api/agreement-workflow/user/${user.id}`;
+        endpoint = `${API_BASE_URL}/api/agreement-workflow/user/${user.id}`;
       }
 
       const response = await axios.get(endpoint);
@@ -42,7 +43,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
 
   const fetchAgreementFields = async (agreementId) => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/agreement-workflow/${agreementId}/fields`);
+      const response = await axios.get(`${API_BASE_URL}/api/agreement-workflow/${agreementId}/fields`);
       setAgreementFields(response.data.fields || []);
     } catch (error) {
       console.error('Error fetching agreement fields:', error);
@@ -167,14 +168,14 @@ const AgreementWorkflow = ({ user, onLogout }) => {
 
       const response = await axios({
         method,
-        url: `http://localhost:5000${endpoint}`,
+        url: `${API_BASE_URL}${endpoint}`,
         data
       });
 
       // Auto-populate fields if agreement was just generated
       if (modalType === 'generate') {
         try {
-          await axios.get(`http://localhost:5000/api/agreement-workflow/${selectedAgreement.id}/auto-populate-fields`);
+          await axios.get(`${API_BASE_URL}/api/agreement-workflow/${selectedAgreement.id}/auto-populate-fields`);
         } catch (error) {
           console.error('Error auto-populating fields:', error);
         }

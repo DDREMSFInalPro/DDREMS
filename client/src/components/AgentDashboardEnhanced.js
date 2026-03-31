@@ -9,6 +9,7 @@ import DocumentManager from './shared/DocumentManager';
 import AIPriceComparison from './AIPriceComparison';
 import axios from 'axios';
 import MessageNotificationWidget from './MessageNotificationWidget';
+import API_BASE_URL from '../config/api';
 
 const AgentDashboardEnhanced = ({ user, onLogout }) => {
   const [currentView, setCurrentView] = useState('dashboard'); // dashboard, commission, viewProperty, browseProperties, agreements
@@ -60,7 +61,7 @@ const AgentDashboardEnhanced = ({ user, onLogout }) => {
   const fetchAgentData = async () => {
     try {
       // Fetch ALL properties first
-      const propertiesRes = await axios.get(`http://localhost:5000/api/properties`);
+      const propertiesRes = await axios.get(`${API_BASE_URL}/api/properties`);
       
       // Filter to get ONLY broker's own properties
       const brokerProperties = propertiesRes.data.filter(p => p.broker_id === user.id);
@@ -80,14 +81,14 @@ const AgentDashboardEnhanced = ({ user, onLogout }) => {
       });
 
       try {
-        const messagesRes = await axios.get(`http://localhost:5000/api/messages/user/${user.id}`);
+        const messagesRes = await axios.get(`${API_BASE_URL}/api/messages/user/${user.id}`);
         setMessages(messagesRes.data.slice(0, 5));
       } catch (error) {
         setMessages([]);
       }
 
       try {
-        const announcementsRes = await axios.get('http://localhost:5000/api/announcements');
+        const announcementsRes = await axios.get(`${API_BASE_URL}/api/announcements`);
         setAnnouncements(announcementsRes.data.slice(0, 3));
       } catch (error) {
         setAnnouncements([]);
@@ -95,7 +96,7 @@ const AgentDashboardEnhanced = ({ user, onLogout }) => {
 
       // Fetch active properties from others (for Browse Properties)
       try {
-        const activePropsRes = await axios.get('http://localhost:5000/api/properties/active');
+        const activePropsRes = await axios.get(`${API_BASE_URL}/api/properties/active`);
         // Filter out broker's own properties
         const othersProperties = activePropsRes.data.filter(p => p.broker_id !== user.id && p.owner_id !== user.id);
         setAllActiveProperties(othersProperties);
@@ -105,7 +106,7 @@ const AgentDashboardEnhanced = ({ user, onLogout }) => {
 
       // Fetch broker's agreements
       try {
-        const agreementsRes = await axios.get(`http://localhost:5000/api/agreements/broker/${user.id}`);
+        const agreementsRes = await axios.get(`${API_BASE_URL}/api/agreements/broker/${user.id}`);
         setAgreements(agreementsRes.data);
       } catch (error) {
         setAgreements([]);
@@ -118,7 +119,7 @@ const AgentDashboardEnhanced = ({ user, onLogout }) => {
   const handleAddProperty = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:5000/api/properties', {
+      const response = await axios.post(`${API_BASE_URL}/api/properties`, {
         ...propertyForm,
         broker_id: user.id,
         status: 'pending'
@@ -146,7 +147,7 @@ const AgentDashboardEnhanced = ({ user, onLogout }) => {
 
   const fetchPreviewData = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/property-images/property/${newPropertyId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/property-images/property/${newPropertyId}`);
       setPreviewImages(response.data);
     } catch (error) {
       console.error('Error fetching preview:', error);
@@ -211,7 +212,7 @@ const AgentDashboardEnhanced = ({ user, onLogout }) => {
   const handleUpdateProperty = async (e) => {
     e.preventDefault();
     try {
-      await axios.put(`http://localhost:5000/api/properties/${selectedProperty.id}`, {
+      await axios.put(`${API_BASE_URL}/api/properties/${selectedProperty.id}`, {
         ...propertyForm
       });
       alert('Property updated successfully!');
@@ -229,7 +230,7 @@ const AgentDashboardEnhanced = ({ user, onLogout }) => {
     }
 
     try {
-      await axios.delete(`http://localhost:5000/api/properties/${propertyId}`);
+      await axios.delete(`${API_BASE_URL}/api/properties/${propertyId}`);
       alert('Property deleted successfully');
       fetchAgentData();
     } catch (error) {

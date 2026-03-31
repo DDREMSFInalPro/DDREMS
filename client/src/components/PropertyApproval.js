@@ -3,6 +3,7 @@ import './PropertyApproval.css';
 import ImageGallery from './shared/ImageGallery';
 import { AIPriceComparison } from './shared/AIAdvisorWidget';
 import axios from 'axios';
+import API_BASE_URL from '../config/api';
 
 const PropertyApproval = ({ user, onClose, onRefresh }) => {
   const [pendingProperties, setPendingProperties] = useState([]);
@@ -18,7 +19,7 @@ const PropertyApproval = ({ user, onClose, onRefresh }) => {
 
   const fetchPendingProperties = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/properties/pending-verification');
+      const response = await axios.get(`${API_BASE_URL}/api/properties/pending-verification`);
       setPendingProperties(response.data);
     } catch (error) {
       console.error('Error fetching pending properties:', error);
@@ -54,7 +55,7 @@ const PropertyApproval = ({ user, onClose, onRefresh }) => {
     setActionLoading(true);
 
     try {
-      await axios.put(`http://localhost:5000/api/properties/${selectedProperty.id}/verify`, {
+      await axios.put(`${API_BASE_URL}/api/properties/${selectedProperty.id}/verify`, {
         status: decision,
         verified_by: user.id,
         notes: notes

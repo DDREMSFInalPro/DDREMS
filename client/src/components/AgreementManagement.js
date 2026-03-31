@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './AgreementManagement.css';
 import PageHeader from './PageHeader';
+import API_BASE_URL from '../config/api';
 
 const AgreementManagement = ({ user, onLogout }) => {
   const [agreements, setAgreements] = useState([]);
@@ -29,11 +30,11 @@ const AgreementManagement = ({ user, onLogout }) => {
       let endpoint = '';
 
       if (user.role === 'user') {
-        endpoint = `http://localhost:5000/api/agreement-requests/customer/${user.id}`;
+        endpoint = `${API_BASE_URL}/api/agreement-requests/customer/${user.id}`;
       } else if (user.role === 'property_admin' || user.role === 'system_admin') {
-        endpoint = `http://localhost:5000/api/agreement-requests/admin/pending`;
+        endpoint = `${API_BASE_URL}/api/agreement-requests/admin/pending`;
       } else {
-        endpoint = `http://localhost:5000/api/agreement-requests/customer/${user.id}`;
+        endpoint = `${API_BASE_URL}/api/agreement-requests/customer/${user.id}`;
       }
 
       const response = await axios.get(endpoint);
@@ -49,20 +50,20 @@ const AgreementManagement = ({ user, onLogout }) => {
   const fetchAgreementDetails = async (agreement) => {
     try {
       // Fetch customer profile
-      const customerRes = await axios.get(`http://localhost:5000/api/profiles/customer/${agreement.customer_id}`).catch(() => null);
+      const customerRes = await axios.get(`${API_BASE_URL}/api/profiles/customer/${agreement.customer_id}`).catch(() => null);
       const customerProfile = customerRes?.data || {};
 
       // Fetch owner profile
-      const ownerRes = await axios.get(`http://localhost:5000/api/profiles/owner/${agreement.owner_id}`).catch(() => null);
+      const ownerRes = await axios.get(`${API_BASE_URL}/api/profiles/owner/${agreement.owner_id}`).catch(() => null);
       const ownerProfile = ownerRes?.data || {};
 
       // Fetch property documents
-      const docsRes = await axios.get(`http://localhost:5000/api/documents/property/${agreement.property_id}`).catch(() => null);
+      const docsRes = await axios.get(`${API_BASE_URL}/api/documents/property/${agreement.property_id}`).catch(() => null);
       const docs = docsRes?.data || [];
       setPropertyDocuments(docs);
 
       // Fetch agreement documents
-      const agreementDocsRes = await axios.get(`http://localhost:5000/api/documents/agreement/${agreement.id}`).catch(() => null);
+      const agreementDocsRes = await axios.get(`${API_BASE_URL}/api/documents/agreement/${agreement.id}`).catch(() => null);
       const agDocs = agreementDocsRes?.data || [];
       setAgreementDocuments(agDocs);
 
@@ -182,7 +183,7 @@ const AgreementManagement = ({ user, onLogout }) => {
 
       const response = await axios({
         method,
-        url: `http://localhost:5000${endpoint}`,
+        url: `${API_BASE_URL}${endpoint}`,
         data
       });
 
@@ -580,18 +581,18 @@ const AgreementManagement = ({ user, onLogout }) => {
                       <div className="document-file-preview">
                         <p>📄 Document File</p>
                         <p>{selectedDocument.document_path}</p>
-                        <a href={`http://localhost:5000${selectedDocument.document_path}`} target="_blank" rel="noopener noreferrer" className="btn-primary">
+                        <a href={`${API_BASE_URL}${selectedDocument.document_path}`} target="_blank" rel="noopener noreferrer" className="btn-primary">
                           📥 Download
                         </a>
                       </div>
                     ) : selectedDocument.document_path.match(/\.(jpg|jpeg|png|gif)$/i) ? (
                       <div className="document-image-preview">
-                        <img src={`http://localhost:5000${selectedDocument.document_path}`} alt="Document" />
+                        <img src={`${API_BASE_URL}${selectedDocument.document_path}`} alt="Document" />
                       </div>
                     ) : (
                       <div className="document-file-preview">
                         <p>📎 File: {selectedDocument.document_path}</p>
-                        <a href={`http://localhost:5000${selectedDocument.document_path}`} target="_blank" rel="noopener noreferrer" className="btn-primary">
+                        <a href={`${API_BASE_URL}${selectedDocument.document_path}`} target="_blank" rel="noopener noreferrer" className="btn-primary">
                           📥 Open File
                         </a>
                       </div>
@@ -612,7 +613,7 @@ const AgreementManagement = ({ user, onLogout }) => {
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setShowDocumentViewer(false)}>Close</button>
               {selectedDocument.document_path && (
-                <a href={`http://localhost:5000${selectedDocument.document_path}`} download className="btn-primary">
+                <a href={`${API_BASE_URL}${selectedDocument.document_path}`} download className="btn-primary">
                   📥 Download
                 </a>
               )}

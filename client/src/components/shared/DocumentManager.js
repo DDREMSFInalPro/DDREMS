@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './DocumentManager.css';
 import axios from 'axios';
+import API_BASE_URL from '../config/api';
 
 const DocumentManager = ({ propertyId, uploadedBy }) => {
   const [documents, setDocuments] = useState([]);
@@ -15,7 +16,7 @@ const DocumentManager = ({ propertyId, uploadedBy }) => {
 
   const fetchDocuments = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/property-documents/property/${propertyId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/property-documents/property/${propertyId}`);
       setDocuments(response.data);
     } catch (error) {
       console.error('Error fetching documents:', error);
@@ -26,7 +27,7 @@ const DocumentManager = ({ propertyId, uploadedBy }) => {
 
   const toggleLock = async (docId, currentLockStatus) => {
     try {
-      await axios.put(`http://localhost:5000/api/property-documents/${docId}/lock`, {
+      await axios.put(`${API_BASE_URL}/api/property-documents/${docId}/lock`, {
         is_locked: !currentLockStatus
       });
       fetchDocuments();
@@ -43,7 +44,7 @@ const DocumentManager = ({ propertyId, uploadedBy }) => {
     }
 
     try {
-      await axios.delete(`http://localhost:5000/api/property-documents/${docId}`);
+      await axios.delete(`${API_BASE_URL}/api/property-documents/${docId}`);
       fetchDocuments();
       alert('Document deleted successfully');
     } catch (error) {
@@ -67,7 +68,7 @@ const DocumentManager = ({ propertyId, uploadedBy }) => {
       return;
     }
     try {
-      const response = await axios.put(`http://localhost:5000/api/property-documents/${docId}/regenerate-key`);
+      const response = await axios.put(`${API_BASE_URL}/api/property-documents/${docId}/regenerate-key`);
       fetchDocuments();
       alert(`New access key: ${response.data.access_key}`);
     } catch (error) {
@@ -85,7 +86,7 @@ const DocumentManager = ({ propertyId, uploadedBy }) => {
     setShowSendModal(true);
     // Fetch users (customers) to send the key to
     try {
-      const response = await axios.get('http://localhost:5000/api/users');
+      const response = await axios.get(`${API_BASE_URL}/api/users`);
       setUsers(response.data.filter(u => u.role === 'user'));
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -98,7 +99,7 @@ const DocumentManager = ({ propertyId, uploadedBy }) => {
       return;
     }
     try {
-      await axios.post('http://localhost:5000/api/messages', {
+      await axios.post(`${API_BASE_URL}/api/messages`, {
         sender_id: uploadedBy,
         receiver_id: recipientId,
         subject: `Access Key for ${selectedDoc.document_name}`,

@@ -9,6 +9,7 @@ import MessageNotificationWidget from './MessageNotificationWidget';
 import AIPriceComparison from './AIPriceComparison';
 import AgreementWorkflow from './AgreementWorkflow';
 import axios from 'axios';
+import API_BASE_URL from '../config/api';
 
 const OwnerDashboardEnhanced = ({ user, onLogout }) => {
   const [stats, setStats] = useState({
@@ -73,10 +74,10 @@ const OwnerDashboardEnhanced = ({ user, onLogout }) => {
   const fetchOwnerData = async () => {
     try {
       const [propertiesRes, agreementRequestsRes, notificationsRes, announcementsRes] = await Promise.all([
-        axios.get(`http://localhost:5000/api/properties/owner/${user.id}`),
-        axios.get(`http://localhost:5000/api/agreement-requests/owner/${user.id}`),
-        axios.get(`http://localhost:5000/api/notifications/${user.id}`),
-        axios.get('http://localhost:5000/api/announcements')
+        axios.get(`${API_BASE_URL}/api/properties/owner/${user.id}`),
+        axios.get(`${API_BASE_URL}/api/agreement-requests/owner/${user.id}`),
+        axios.get(`${API_BASE_URL}/api/notifications/${user.id}`),
+        axios.get(`${API_BASE_URL}/api/announcements`)
       ]);
 
       setMyProperties(propertiesRes.data);
@@ -101,7 +102,7 @@ const OwnerDashboardEnhanced = ({ user, onLogout }) => {
       // Fetch document access requests for owner's properties
       const propertyIds = propertiesRes.data.map(p => p.id);
       const requestsPromises = propertyIds.map(id =>
-        axios.get(`http://localhost:5000/api/document-access/property/${id}`).catch(() => ({ data: [] }))
+        axios.get(`${API_BASE_URL}/api/document-access/property/${id}`).catch(() => ({ data: [] }))
       );
       const requestsResults = await Promise.all(requestsPromises);
       const allRequests = requestsResults.flatMap(res => res.data);
@@ -115,7 +116,7 @@ const OwnerDashboardEnhanced = ({ user, onLogout }) => {
   const handleAddProperty = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:5000/api/properties', {
+      const response = await axios.post(`${API_BASE_URL}/api/properties`, {
         ...propertyForm,
         owner_id: user.id,
         status: 'pending',
@@ -147,9 +148,9 @@ const OwnerDashboardEnhanced = ({ user, onLogout }) => {
     try {
       // Fetch actual property data from DB
       const [propertyRes, imagesRes, docsRes] = await Promise.all([
-        axios.get(`http://localhost:5000/api/properties/${newPropertyId}`),
-        axios.get(`http://localhost:5000/api/property-images/property/${newPropertyId}`),
-        axios.get(`http://localhost:5000/api/property-documents/property/${newPropertyId}`).catch(() => ({ data: [] }))
+        axios.get(`${API_BASE_URL}/api/properties/${newPropertyId}`),
+        axios.get(`${API_BASE_URL}/api/property-images/property/${newPropertyId}`),
+        axios.get(`${API_BASE_URL}/api/property-documents/property/${newPropertyId}`).catch(() => ({ data: [] }))
       ]);
       setPreviewProperty(propertyRes.data);
       setPreviewImages(imagesRes.data);
@@ -208,7 +209,7 @@ const OwnerDashboardEnhanced = ({ user, onLogout }) => {
   const deleteProperty = async (propertyId) => {
     if (!window.confirm('Are you sure you want to delete this property?')) return;
     try {
-      await axios.delete(`http://localhost:5000/api/properties/${propertyId}`);
+      await axios.delete(`${API_BASE_URL}/api/properties/${propertyId}`);
       alert('Property deleted successfully');
       fetchOwnerData();
     } catch (error) {
@@ -219,7 +220,7 @@ const OwnerDashboardEnhanced = ({ user, onLogout }) => {
 
   const handleAgreementResponse = async (requestId, status) => {
     try {
-      await axios.put(`http://localhost:5000/api/agreement-requests/${requestId}/respond`, { 
+      await axios.put(`${API_BASE_URL}/api/agreement-requests/${requestId}/respond`, { 
         status,
         responded_by: user.id,
         response_message: status === 'accepted' ? 'Your agreement request has been accepted.' : 'Your agreement request has been rejected.'
@@ -234,7 +235,7 @@ const OwnerDashboardEnhanced = ({ user, onLogout }) => {
 
   const handleDocumentAccessResponse = async (requestId, status) => {
     try {
-      await axios.put(`http://localhost:5000/api/document-access/${requestId}/respond`, { status });
+      await axios.put(`${API_BASE_URL}/api/document-access/${requestId}/respond`, { status });
       alert(`Access request ${status}!`);
       fetchOwnerData();
     } catch (error) {
@@ -250,7 +251,7 @@ const OwnerDashboardEnhanced = ({ user, onLogout }) => {
 
   const sendDocumentKey = async (document, recipientId) => {
     try {
-      await axios.post('http://localhost:5000/api/messages', {
+      await axios.post(`${API_BASE_URL}/api/messages`, {
         sender_id: user.id,
         receiver_id: recipientId,
         subject: `Document Access Key for ${selectedProperty?.title}`,
@@ -268,7 +269,7 @@ const OwnerDashboardEnhanced = ({ user, onLogout }) => {
 
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/announcements', {
+      await axios.post(`${API_BASE_URL}/api/announcements`, {
         ...announcementForm,
         author_id: user.id
       });

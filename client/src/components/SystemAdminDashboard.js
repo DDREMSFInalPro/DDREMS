@@ -18,10 +18,11 @@ import MessageNotificationWidget from './MessageNotificationWidget';
 import AdminMessagesView from './AdminMessagesView';
 import AgreementWorkflow from './AgreementWorkflow';
 import AgreementManagement from './AgreementManagement';
+import API_BASE_URL from '../config/api';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-const API_BASE = `http://${window.location.hostname}:5000/api`;
+const API_BASE = API_BASE_URL + '/api';
 
 const SystemAdminDashboard = ({ user, onLogout, setCurrentPage }) => {
   const [currentView, setCurrentView] = useState('dashboard'); // dashboard, profileApproval, users

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import './DocumentUploader.css';
+import API_BASE_URL from '../config/api';
 
 const DocumentUploader = ({ propertyId, uploadedBy, onUploadComplete }) => {
   const [uploading, setUploading] = useState(false);
@@ -51,7 +52,7 @@ const DocumentUploader = ({ propertyId, uploadedBy, onUploadComplete }) => {
         size: `${(selectedFile.size / 1024).toFixed(2)} KB`
       });
 
-      const response = await axios.post('http://localhost:5000/api/property-documents', {
+      const response = await axios.post(`${API_BASE_URL}/api/property-documents`, {
         property_id: propertyId,
         document_name: documentName,
         document_url: documentBase64,

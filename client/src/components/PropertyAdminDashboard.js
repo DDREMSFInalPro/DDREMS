@@ -15,7 +15,8 @@ import MessageNotificationWidget from './MessageNotificationWidget';
 import AdminMessagesView from './AdminMessagesView';
 import AgreementWorkflow from './AgreementWorkflow';
 import AgreementManagement from './AgreementManagement';
-const API_BASE = `http://${window.location.hostname}:5000/api`;
+import API_BASE_URL from '../config/api';
+const API_BASE = `${API_BASE_URL}/api`;
 
 const PropertyAdminDashboard = ({ user, onLogout, setCurrentPage, initialView }) => {
   const [currentView, setCurrentView] = useState(initialView || 'dashboard'); // dashboard, approval, all-properties, reports, documents, profileApproval, users
@@ -189,7 +190,7 @@ const PropertyAdminDashboard = ({ user, onLogout, setCurrentPage, initialView })
     if (!window.confirm(confirmMessages[action])) return;
 
     try {
-      await axios.put(`http://localhost:5000/api/properties/${propertyId}/verify`, {
+      await axios.put(`${API_BASE_URL}/api/properties/${propertyId}/verify`, {
         status: action,
         verified_by: user.id,
         notes: `Quick ${action} by admin`

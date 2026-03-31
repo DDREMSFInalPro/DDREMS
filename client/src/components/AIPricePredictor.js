@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './AIPricePredictor.css';
+import API_BASE_URL from '../config/api';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE = API_BASE_URL + '/api';
 
 const AIPricePredictor = ({ user }) => {
     const [activeTab, setActiveTab] = useState('predict');

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './BrokersManagement.css';
 import AddBroker from './AddBroker';
 import axios from 'axios';
+import API_BASE_URL from '../config/api';
 
 const BrokersManagement = ({ onBack }) => {
   const [brokers, setBrokers] = useState([]);
@@ -30,7 +31,7 @@ const BrokersManagement = ({ onBack }) => {
   const fetchBrokers = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:5000/api/brokers');
+      const response = await axios.get(`${API_BASE_URL}/api/brokers`);
       setBrokers(response.data);
     } catch (error) {
       console.error('Error fetching brokers:', error);
@@ -44,7 +45,7 @@ const BrokersManagement = ({ onBack }) => {
     setSelectedBrokerKeyRequests([]);
 
     try {
-      const response = await axios.get(`http://localhost:5000/api/key-requests/broker/${broker.user_id}`);
+      const response = await axios.get(`${API_BASE_URL}/api/key-requests/broker/${broker.user_id}`);
       setSelectedBrokerKeyRequests(response.data);
     } catch (error) {
       console.error('Error fetching broker key requests:', error);
@@ -73,7 +74,7 @@ const BrokersManagement = ({ onBack }) => {
     e.preventDefault();
     try {
       // Create user account
-      const userResponse = await axios.post('http://localhost:5000/api/auth/register', {
+      const userResponse = await axios.post(`${API_BASE_URL}/api/auth/register`, {
         name: addForm.name,
         email: addForm.email,
         phone: addForm.phone,
@@ -82,7 +83,7 @@ const BrokersManagement = ({ onBack }) => {
       });
 
       // Create broker profile
-      await axios.post('http://localhost:5000/api/brokers', {
+      await axios.post(`${API_BASE_URL}/api/brokers`, {
         user_id: userResponse.data.userId,
         full_name: addForm.full_name,
         phone: addForm.phone,
@@ -106,7 +107,7 @@ const BrokersManagement = ({ onBack }) => {
   const handleEditBroker = async (e) => {
     e.preventDefault();
     try {
-      const API_BASE = `http://${window.location.hostname}:5000/api`;
+      const API_BASE = API_BASE_URL + '/api';
 
       // 1. Update User Account
       await axios.put(`${API_BASE}/users/update/${selectedBroker.user_id}`, {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './DocumentViewer.css';
 import axios from 'axios';
+import API_BASE_URL from '../config/api';
 
 const DocumentViewerAdmin = ({ propertyId, property, userId, onVerificationAction }) => {
   const [documents, setDocuments] = useState([]);
@@ -15,7 +16,7 @@ const DocumentViewerAdmin = ({ propertyId, property, userId, onVerificationActio
   const fetchDocuments = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`http://localhost:5000/api/property-documents/property/${propertyId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/property-documents/property/${propertyId}`);
       setDocuments(response.data);
     } catch (error) {
       console.error('Error fetching documents:', error);
@@ -38,7 +39,7 @@ const DocumentViewerAdmin = ({ propertyId, property, userId, onVerificationActio
 
     setVerifying(true);
     try {
-      const response = await axios.post('http://localhost:5000/api/property-documents/verify-access', {
+      const response = await axios.post(`${API_BASE_URL}/api/property-documents/verify-access`, {
         document_id: selectedDoc.id,
         access_key: accessKey.trim().toUpperCase()
       });
@@ -93,7 +94,7 @@ const DocumentViewerAdmin = ({ propertyId, property, userId, onVerificationActio
     if (!window.confirm(`Are you sure you want to ${action} this document?`)) return;
 
     try {
-      await axios.put(`http://localhost:5000/api/property-documents/${doc.id}/lock`, {
+      await axios.put(`${API_BASE_URL}/api/property-documents/${doc.id}/lock`, {
         is_locked: !doc.is_locked
       });
       alert(`Document ${action}ed successfully!`);
@@ -108,7 +109,7 @@ const DocumentViewerAdmin = ({ propertyId, property, userId, onVerificationActio
     if (!window.confirm('Regenerate access key? The old key will no longer work.')) return;
 
     try {
-      const response = await axios.put(`http://localhost:5000/api/property-documents/${doc.id}/regenerate-key`);
+      const response = await axios.put(`${API_BASE_URL}/api/property-documents/${doc.id}/regenerate-key`);
       alert(`✅ Access key regenerated!\n\nNew Key: ${response.data.access_key}\n\nMake sure to send this new key to the property owner.`);
       fetchDocuments(); // Refresh the documents list
     } catch (error) {
@@ -121,7 +122,7 @@ const DocumentViewerAdmin = ({ propertyId, property, userId, onVerificationActio
     if (!window.confirm('PERMANENTLY DELETE this document? This action cannot be undone!')) return;
 
     try {
-      await axios.delete(`http://localhost:5000/api/property-documents/${doc.id}`);
+      await axios.delete(`${API_BASE_URL}/api/property-documents/${doc.id}`);
       alert('Document deleted successfully!');
       fetchDocuments(); // Refresh the documents list
     } catch (error) {
@@ -140,7 +141,7 @@ const DocumentViewerAdmin = ({ propertyId, property, userId, onVerificationActio
     if (!window.confirm(confirmMessages[action])) return;
 
     try {
-      await axios.put(`http://localhost:5000/api/properties/${propertyId}/verify`, {
+      await axios.put(`${API_BASE_URL}/api/properties/${propertyId}/verify`, {
         status: action,
         verified_by: userId,
         notes: `${action} after document review by admin`
@@ -162,7 +163,7 @@ const DocumentViewerAdmin = ({ propertyId, property, userId, onVerificationActio
     if (!window.confirm('PERMANENTLY DELETE this property? This action cannot be undone!')) return;
 
     try {
-      await axios.delete(`http://localhost:5000/api/properties/${propertyId}`);
+      await axios.delete(`${API_BASE_URL}/api/properties/${propertyId}`);
       alert('Property deleted permanently.');
       setShowDocumentModal(false);
       

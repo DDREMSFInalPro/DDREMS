@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import API_BASE_URL from '../config/api';
 import { Pie, Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -37,7 +38,7 @@ const Reports = ({ user, onLogout, onBack }) => {
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/properties/stats');
+      const response = await axios.get(`${API_BASE_URL}/api/properties/stats`);
       setStats(response.data);
     } catch (error) {
       console.error('Error fetching stats:', error);
