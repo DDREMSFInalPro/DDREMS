@@ -21,7 +21,7 @@ const OwnerProfile = ({ user, onComplete }) => {
 
   useEffect(() => {
     fetchProfile();
-  }, [user.id]);
+  }, [user.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchProfile = async () => {
     try {

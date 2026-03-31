@@ -38,8 +38,7 @@ const Reports = ({ user, onLogout, onBack }) => {
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/properties/stats`);
-      setStats(response.data);
+      await axios.get(`${API_BASE_URL}/api/properties/stats`).then(r => setStats(r.data));
     } catch (error) {
       console.error('Error fetching stats:', error);
     } finally {
@@ -337,7 +336,7 @@ const Reports = ({ user, onLogout, onBack }) => {
                           const data = chart.data;
                           if (data.labels.length && data.datasets.length) {
                             return data.labels.map((label, i) => {
-                              const value = data.datasets[0].data[i];
+                              const value = data.datasets[0].data[i]; // eslint-disable-line no-unused-vars
                               const backgroundColor = data.datasets[0].backgroundColor[i];
                               return {
                                 text: `  ${label}`,

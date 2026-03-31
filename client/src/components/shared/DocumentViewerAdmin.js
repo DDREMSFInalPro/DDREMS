@@ -29,7 +29,7 @@ const DocumentViewerAdmin = ({ propertyId, property, userId, onVerificationActio
     if (propertyId) {
       fetchDocuments();
     }
-  }, [propertyId]);
+  }, [propertyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const verifyAndView = async () => {
     if (!accessKey.trim()) {

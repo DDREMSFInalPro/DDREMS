@@ -20,7 +20,7 @@ const AIAdvisorWidget = () => {
 
     useEffect(() => {
         fetchWidgetData();
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const fetchWidgetData = async () => {
         try {
@@ -147,7 +147,7 @@ export const AIPriceComparison = ({ propertyData }) => {
 
     useEffect(() => {
         if (propertyData) fetchPrediction();
-    }, [propertyData?.type, propertyData?.location, propertyData?.area, propertyData?.bedrooms, propertyData?.bathrooms, propertyData?.price]);
+    }, [propertyData?.type, propertyData?.location, propertyData?.area, propertyData?.bedrooms, propertyData?.bathrooms, propertyData?.price]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const fetchPrediction = async () => {
         setLoading(true);

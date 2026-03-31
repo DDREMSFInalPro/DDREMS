@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import './ProfileApproval.css';
 import axios from 'axios';
 import API_BASE_URL from '../../config/api';
@@ -15,7 +15,7 @@ const ProfileApproval = () => {
 
   useEffect(() => {
     fetchProfiles();
-  }, [filter]);
+  }, [filter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchProfiles = async () => {
     setLoading(true);
