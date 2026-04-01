@@ -1,12 +1,13 @@
-const { Pool } = require('pg');
-const dotenv = require('dotenv');
+const { Pool } = require("pg");
+const dotenv = require("dotenv");
+const path = require("path");
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 const pool = new Pool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  password: String(process.env.DB_PASSWORD),
   database: process.env.DB_NAME,
   port: process.env.DB_PORT,
   max: 10,
@@ -27,25 +28,28 @@ function expandBatchInsert(text, params) {
   // Detect pattern: INSERT INTO ... VALUES ?  with params = [[array of arrays]]
   if (!text.match(/VALUES\s+\?\s*$/i)) return null;
   if (!params || params.length !== 1 || !Array.isArray(params[0])) return null;
-  
+
   const rows = params[0];
   if (rows.length === 0 || !Array.isArray(rows[0])) return null;
-  
+
   const colsPerRow = rows[0].length;
   const allParams = [];
   const valueClauses = [];
-  
+
   for (const row of rows) {
     const placeholders = [];
     for (const val of row) {
       allParams.push(val);
       placeholders.push(`$${allParams.length}`);
     }
-    valueClauses.push(`(${placeholders.join(', ')})`);
+    valueClauses.push(`(${placeholders.join(", ")})`);
   }
-  
+
   // Replace "VALUES ?" with expanded values
-  const newText = text.replace(/VALUES\s+\?\s*$/i, `VALUES ${valueClauses.join(', ')}`);
+  const newText = text.replace(
+    /VALUES\s+\?\s*$/i,
+    `VALUES ${valueClauses.join(", ")}`,
+  );
   return { text: newText, params: allParams };
 }
 
@@ -53,7 +57,7 @@ function expandBatchInsert(text, params) {
 async function executeQuery(queryFn, text, params) {
   let convertedText = text;
   let convertedParams = params;
-  
+
   // Check for batch insert pattern first
   const batch = expandBatchInsert(text, params);
   if (batch) {
@@ -62,15 +66,15 @@ async function executeQuery(queryFn, text, params) {
   } else {
     convertedText = convertPlaceholders(text);
   }
-  
+
   const trimmed = convertedText.trim().toUpperCase();
-  const isInsert = trimmed.startsWith('INSERT');
-  const isUpdate = trimmed.startsWith('UPDATE');
-  const isDelete = trimmed.startsWith('DELETE');
+  const isInsert = trimmed.startsWith("INSERT");
+  const isUpdate = trimmed.startsWith("UPDATE");
+  const isDelete = trimmed.startsWith("DELETE");
 
   // For INSERT queries, automatically add RETURNING id if not present
-  if (isInsert && !convertedText.toUpperCase().includes('RETURNING')) {
-    convertedText = convertedText.replace(/;?\s*$/, ' RETURNING id');
+  if (isInsert && !convertedText.toUpperCase().includes("RETURNING")) {
+    convertedText = convertedText.replace(/;?\s*$/, " RETURNING id");
   }
 
   const result = await queryFn(convertedText, convertedParams);
@@ -79,7 +83,7 @@ async function executeQuery(queryFn, text, params) {
     const resultHeader = {
       insertId: result.rows[0]?.id,
       affectedRows: result.rowCount,
-      rows: result.rows
+      rows: result.rows,
     };
     return [resultHeader, []];
   }
@@ -110,11 +114,11 @@ const db = {
       execute: async (text, params) => executeQuery(clientQuery, text, params),
       query: async (text, params) => executeQuery(clientQuery, text, params),
       release: () => client.release(),
-      beginTransaction: async () => await client.query('BEGIN'),
-      commit: async () => await client.query('COMMIT'),
-      rollback: async () => await client.query('ROLLBACK'),
+      beginTransaction: async () => await client.query("BEGIN"),
+      commit: async () => await client.query("COMMIT"),
+      rollback: async () => await client.query("ROLLBACK"),
     };
-  }
+  },
 };
 
 module.exports = db;

@@ -146,7 +146,7 @@
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
   gap: 20px;
   margin-bottom: 30px;
 }
@@ -666,5 +666,50 @@
 
   .request-actions {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .broker-header {
+    padding: 20px;
+  }
+
+  .broker-info h1 {
+    font-size: 22px;
+  }
+
+  .broker-profile-photo,
+  .broker-profile-placeholder {
+    width: 60px;
+    height: 60px;
+  }
+
+  .tab-btn {
+    padding: 12px 8px;
+    font-size: 12px;
+  }
+
+  .broker-content {
+    padding: 0 12px;
+    margin: 20px auto;
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .request-card {
+    padding: 12px;
+  }
+
+  .profile-photo-large,
+  .profile-photo-placeholder {
+    width: 120px;
+    height: 120px;
+    font-size: 40px;
+  }
+
+  .modal-content {
+    width: 96%;
   }
 }

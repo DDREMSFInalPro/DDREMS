@@ -17,7 +17,7 @@
 /* Agreements Grid */
 .agreements-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr));
     gap: 20px;
 }
 
@@ -288,4 +288,25 @@
     .form-grid { grid-template-columns: 1fr; }
     .modal-content { padding: 20px; margin: 10px; }
     .agreement-actions { justify-content: center; }
+}
+@media (max-width: 480px) {
+  .modal-content {
+    width: 96%;
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .btn-primary,
+  .btn-success,
+  .btn-danger {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
 }

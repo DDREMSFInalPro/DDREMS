@@ -40,3 +40,11 @@
 .broker-profile .upload-placeholder:hover {
   border-color: #059669;
 }
+
+@media (max-width: 480px) {
+  .modal-content {
+    width: 96%;
+    padding: 16px;
+    border-radius: 12px;
+  }
+}

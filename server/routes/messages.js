@@ -125,15 +125,15 @@ router.get('/user/:userId', verifyUser, async (req, res) => {
                sender.role as sender_role,
                receiver.name as receiver_name,
                CASE 
-                 WHEN m.is_group = 1 THEN (
-                   SELECT CASE WHEN mr.is_read IS NULL THEN 0 ELSE mr.is_read END
+                 WHEN m.is_group = TRUE THEN (
+                   SELECT CASE WHEN mr.is_read IS NULL THEN FALSE ELSE mr.is_read END
                    FROM message_recipients mr 
                    WHERE mr.message_id = m.id AND mr.user_id = ?
                  )
                  ELSE m.is_read
                END as is_read_status,
                CASE 
-                 WHEN m.is_group = 1 THEN (
+                 WHEN m.is_group = TRUE THEN (
                    SELECT COUNT(*) FROM message_recipients mr WHERE mr.message_id = m.id
                  )
                  ELSE 1
@@ -144,7 +144,7 @@ router.get('/user/:userId', verifyUser, async (req, res) => {
         LEFT JOIN message_recipients mr ON m.id = mr.message_id
         WHERE m.sender_id = ? 
            OR m.receiver_id = ? 
-           OR (m.is_group = 1 AND (mr.user_id = ? OR m.sender_id = ?))
+           OR (m.is_group = TRUE AND (mr.user_id = ? OR m.sender_id = ?))
         ORDER BY m.created_at DESC
         LIMIT 100
       `;
@@ -157,15 +157,15 @@ router.get('/user/:userId', verifyUser, async (req, res) => {
                sender.role as sender_role,
                receiver.name as receiver_name,
                CASE 
-                 WHEN m.is_group = 1 THEN (
-                   SELECT CASE WHEN mr.is_read IS NULL THEN 0 ELSE mr.is_read END
+                 WHEN m.is_group = TRUE THEN (
+                   SELECT CASE WHEN mr.is_read IS NULL THEN FALSE ELSE mr.is_read END
                    FROM message_recipients mr 
                    WHERE mr.message_id = m.id AND mr.user_id = ?
                  )
                  ELSE m.is_read
                END as is_read_status,
                CASE 
-                 WHEN m.is_group = 1 THEN (
+                 WHEN m.is_group = TRUE THEN (
                    SELECT COUNT(*) FROM message_recipients mr WHERE mr.message_id = m.id
                  )
                  ELSE 1
@@ -176,14 +176,14 @@ router.get('/user/:userId', verifyUser, async (req, res) => {
         LEFT JOIN message_recipients mr ON m.id = mr.message_id
         WHERE m.sender_id = ? 
            OR (m.receiver_id = ? AND sender.role = 'system_admin')
-           OR (m.is_group = 1 AND sender.role = 'system_admin' AND mr.user_id = ?)
+           OR (m.is_group = TRUE AND sender.role = 'system_admin' AND mr.user_id = ?)
         ORDER BY m.created_at DESC
         LIMIT 100
       `;
       params = [userIdInt, userIdInt, userIdInt, userIdInt];
     } else {
       // Regular users see:
-      // 1. Messages sent directly to them (receiver_id = userId AND is_group = 0)
+      // 1. Messages sent directly to them (receiver_id = userId AND is_group = FALSE)
       // 2. Group messages they're in (message_recipients table)
       // 3. Messages from admin/property_admin that are directed TO this user
       query = `
@@ -192,8 +192,8 @@ router.get('/user/:userId', verifyUser, async (req, res) => {
                sender.role as sender_role,
                receiver.name as receiver_name,
                CASE 
-                 WHEN m.is_group = 1 THEN (
-                   SELECT COALESCE(mr.is_read, 0)
+                 WHEN m.is_group = TRUE THEN (
+                   SELECT COALESCE(mr.is_read, FALSE)
                    FROM message_recipients mr 
                    WHERE mr.message_id = m.id AND mr.user_id = ?
                    LIMIT 1
@@ -201,7 +201,7 @@ router.get('/user/:userId', verifyUser, async (req, res) => {
                  ELSE m.is_read
                END as is_read_status,
                CASE 
-                 WHEN m.is_group = 1 THEN (
+                 WHEN m.is_group = TRUE THEN (
                    SELECT COUNT(*) FROM message_recipients mr WHERE mr.message_id = m.id
                  )
                  ELSE 1
@@ -211,9 +211,9 @@ router.get('/user/:userId', verifyUser, async (req, res) => {
         LEFT JOIN users receiver ON m.receiver_id = receiver.id
         WHERE 
           -- Direct messages to this user (from anyone)
-          (m.receiver_id = ? AND m.is_group = 0)
+          (m.receiver_id = ? AND m.is_group = FALSE)
           -- Group messages this user is a recipient of
-          OR (m.is_group = 1 AND EXISTS (
+          OR (m.is_group = TRUE AND EXISTS (
             SELECT 1 FROM message_recipients mr 
             WHERE mr.message_id = m.id AND mr.user_id = ?
           ))
@@ -370,7 +370,7 @@ router.get('/admin/conversations/:userId', verifyUser, async (req, res) => {
         u.email as other_user_email,
         MAX(m.created_at) as last_message_time,
         COUNT(m.id) as message_count,
-        SUM(CASE WHEN m.receiver_id = ? AND m.is_read = 0 THEN 1 ELSE 0 END) as unread_count
+        SUM(CASE WHEN m.receiver_id = ? AND m.is_read = FALSE THEN 1 ELSE 0 END) as unread_count
       FROM messages m
       LEFT JOIN users u ON (
         CASE 
@@ -490,7 +490,7 @@ router.get('/unread/:userId', verifyUser, async (req, res) => {
     const [singleMessages] = await db.query(`
       SELECT COUNT(*) as count
       FROM messages m
-      WHERE m.receiver_id = ? AND m.is_read = 0 AND m.is_group = 0
+      WHERE m.receiver_id = ? AND m.is_read = FALSE AND m.is_group = FALSE
     `, [userIdInt]);
 
     // Get unread count for group messages
@@ -498,14 +498,14 @@ router.get('/unread/:userId', verifyUser, async (req, res) => {
       SELECT COUNT(*) as count
       FROM messages m
       INNER JOIN message_recipients mr ON m.id = mr.message_id
-      WHERE mr.user_id = ? AND mr.is_read = 0 AND m.is_group = 1
+      WHERE mr.user_id = ? AND mr.is_read = FALSE AND m.is_group = TRUE
     `, [userIdInt]);
 
     // Get unread notifications count
     const [notifications] = await db.query(`
       SELECT COUNT(*) as count
       FROM notifications
-      WHERE user_id = ? AND is_read = 0
+      WHERE user_id = ? AND is_read = FALSE
     `, [userIdInt]);
 
     const totalUnread = singleMessages[0].count + groupMessages[0].count;
@@ -668,7 +668,7 @@ router.post('/', verifyUser, checkSendPermission, async (req, res) => {
       // Insert message
       const [result] = await db.query(`
         INSERT INTO messages (sender_id, receiver_id, subject, message, message_type, is_read, is_group, created_at)
-        VALUES (?, ?, ?, ?, ?, 0, 0, NOW())
+        VALUES (?, ?, ?, ?, ?, FALSE, FALSE, NOW())
       `, [senderIdInt, receiverIdInt, subject.trim(), message.trim(), messageType]);
       
       // Create notification using proper notifications table structure
@@ -745,12 +745,12 @@ router.post('/', verifyUser, checkSendPermission, async (req, res) => {
     // Insert group message
     const [result] = await db.query(`
       INSERT INTO messages (sender_id, subject, message, message_type, is_read, is_group, created_at)
-      VALUES (?, ?, ?, ?, 0, 1, NOW())
+      VALUES (?, ?, ?, ?, FALSE, TRUE, NOW())
     `, [senderIdInt, subject.trim(), message.trim(), messageType]);
 
     // Create group message recipients (only for active users)
     const activeReceiverIds = activeReceivers.map(r => r.id);
-    const recipientValues = activeReceiverIds.map(id => [result.insertId, id, 0, null]); // message_id, user_id, is_read, read_at
+    const recipientValues = activeReceiverIds.map(id => [result.insertId, id, false, null]); // message_id, user_id, is_read, read_at
     
     if (recipientValues.length > 0) {
       await db.query(`
@@ -822,11 +822,11 @@ router.put('/read/:messageId', verifyUser, async (req, res) => {
 
     // For single messages, update messages table
     if (!message[0].is_group) {
-      await db.query('UPDATE messages SET is_read = 1 WHERE id = ?', [messageIdInt]);
+      await db.query('UPDATE messages SET is_read = TRUE WHERE id = ?', [messageIdInt]);
     } else {
       // For group messages, update message_recipients table
       await db.query(
-        'UPDATE message_recipients SET is_read = 1, read_at = NOW() WHERE message_id = ? AND user_id = ?',
+        'UPDATE message_recipients SET is_read = TRUE, read_at = NOW() WHERE message_id = ? AND user_id = ?',
         [messageIdInt, req.userId]
       );
     }
@@ -848,7 +848,7 @@ router.put('/read-all/:userId', verifyUser, async (req, res) => {
     }
 
     await db.query(`
-      UPDATE messages SET is_read = 1 WHERE receiver_id = ? OR is_group = 1
+      UPDATE messages SET is_read = TRUE WHERE receiver_id = ? OR is_group = TRUE
     `, [userIdInt]);
     res.json({ message: 'All messages marked as read', success: true });
   } catch (error) {
@@ -1099,7 +1099,7 @@ router.post('/bulk', verifyUser, checkSendPermission, async (req, res) => {
     // Insert group message
     const [result] = await db.query(`
       INSERT INTO messages (sender_id, subject, message, message_type, is_read, is_group, created_at)
-      VALUES (?, ?, ?, ?, 0, 1, NOW())
+      VALUES (?, ?, ?, ?, FALSE, TRUE, NOW())
     `, [senderIdInt, subject, message, message_type || 'general']);
 
     // Create group message recipients in batches to improve performance
@@ -1306,7 +1306,7 @@ router.post('/:messageId/reply', verifyUser, checkSendPermission, async (req, re
     // Create the reply message
     const [result] = await db.query(`
       INSERT INTO messages (sender_id, receiver_id, subject, message, message_type, is_read, is_group, parent_id, created_at)
-      VALUES (?, ?, ?, ?, ?, 0, 0, ?, NOW())
+      VALUES (?, ?, ?, ?, ?, FALSE, FALSE, ?, NOW())
     `, [senderIdInt, receiverId, subject.trim(), message.trim(), 'general', messageIdInt]);
 
     // Update reply count on parent message
@@ -1325,7 +1325,7 @@ router.post('/:messageId/reply', verifyUser, checkSendPermission, async (req, re
         `New reply from ${sender[0].name}`, 
         subject.trim(), 
         'info', 
-        0,
+        false,
         `/messages/${result.insertId}`
       ]
     );

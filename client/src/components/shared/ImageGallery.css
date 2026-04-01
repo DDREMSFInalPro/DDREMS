@@ -76,7 +76,7 @@
 
 .gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr));
   gap: 12px;
 }
 
@@ -192,4 +192,12 @@
   margin: 0;
   color: #718096;
   font-size: 14px;
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    width: 96%;
+    padding: 16px;
+    border-radius: 12px;
+  }
 }

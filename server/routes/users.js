@@ -60,7 +60,7 @@ router.put('/update/:id', async (req, res) => {
     if (email !== undefined) { updates.push('email = ?'); params.push(email); }
     if (role !== undefined) { updates.push('role = ?'); params.push(role); }
     if (status !== undefined) { updates.push('status = ?'); params.push(status); }
-    if (profile_approved !== undefined) { updates.push('profile_approved = ?'); params.push(profile_approved ? 1 : 0); }
+    if (profile_approved !== undefined) { updates.push('profile_approved = ?'); params.push(!!profile_approved); }
 
     if (updates.length === 0) {
       return res.status(400).json({ message: 'No fields to update' });
@@ -93,7 +93,7 @@ router.put('/:id', async (req, res) => {
     if (email !== undefined) { updates.push('email = ?'); params.push(email); }
     if (role !== undefined) { updates.push('role = ?'); params.push(role); }
     if (status !== undefined) { updates.push('status = ?'); params.push(status); }
-    if (profile_approved !== undefined) { updates.push('profile_approved = ?'); params.push(profile_approved ? 1 : 0); }
+    if (profile_approved !== undefined) { updates.push('profile_approved = ?'); params.push(!!profile_approved); }
 
     if (updates.length === 0) return res.status(400).json({ message: 'No fields to update' });
 
@@ -128,7 +128,7 @@ router.post('/add', async (req, res) => {
 
     // Insert user
     const [result] = await db.query(
-      'INSERT INTO users (name, email, password, phone, role, status, profile_approved, profile_completed) VALUES (?, ?, ?, ?, ?, "active", 0, 0)',
+      "INSERT INTO users (name, email, password, phone, role, status, profile_approved, profile_completed) VALUES (?, ?, ?, ?, ?, 'active', FALSE, FALSE)",
       [name, email, hashedPassword, phone || null, role]
     );
 

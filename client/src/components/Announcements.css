@@ -4,7 +4,7 @@
 
 .announcements-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(350px, 100%), 1fr));
   gap: 25px;
 }
 
@@ -195,5 +195,27 @@
   .modal-content {
     width: 95%;
     padding: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    width: 96%;
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .btn-primary,
+  .btn-success,
+  .btn-danger {
+    padding: 10px 14px;
+    font-size: 13px;
   }
 }

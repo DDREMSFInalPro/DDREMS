@@ -220,3 +220,27 @@
     font-size: 24px;
   }
 }
+
+@media (max-width: 480px) {
+  .register-container {
+    padding: 12px;
+  }
+
+  .register-card {
+    padding: 20px 14px;
+    border-radius: 12px;
+  }
+
+  .register-header h1 {
+    font-size: 20px;
+  }
+
+  .btn-register {
+    padding: 12px;
+    font-size: 15px;
+  }
+
+  .register-info {
+    padding: 14px;
+  }
+}

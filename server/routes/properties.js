@@ -1,9 +1,9 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const db = require('../config/db');
+const db = require("../config/db");
 
 // Get all properties (with main image from property_images table)
-router.get('/', async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const [properties] = await db.query(`
       SELECT p.*, b.name as broker_name, u.name as owner_name,
@@ -16,12 +16,12 @@ router.get('/', async (req, res) => {
     `);
     res.json(properties);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Get only ACTIVE properties (for customers)
-router.get('/active', async (req, res) => {
+router.get("/active", async (req, res) => {
   try {
     const [properties] = await db.query(`
       SELECT p.*, b.name as broker_name, u.name as owner_name,
@@ -36,23 +36,39 @@ router.get('/active', async (req, res) => {
     `);
     res.json(properties);
   } catch (error) {
-    console.error('Get active properties error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("Get active properties error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Get property stats for admin dashboard
-router.get('/stats', async (req, res) => {
+router.get("/stats", async (req, res) => {
   try {
-    const [total] = await db.query('SELECT COUNT(*) as count FROM properties');
-    const [active] = await db.query("SELECT COUNT(*) as count FROM properties WHERE status = 'active'");
-    const [pending] = await db.query("SELECT COUNT(*) as count FROM properties WHERE status = 'pending'");
-    const [sold] = await db.query("SELECT COUNT(*) as count FROM properties WHERE status = 'sold'");
-    const [rented] = await db.query("SELECT COUNT(*) as count FROM properties WHERE status = 'rented'");
-    const [inactive] = await db.query("SELECT COUNT(*) as count FROM properties WHERE status = 'inactive'");
-    const [suspended] = await db.query("SELECT COUNT(*) as count FROM properties WHERE status = 'suspended'");
-    const [verified] = await db.query("SELECT COUNT(*) as count FROM properties WHERE verified = TRUE");
-    const [unverified] = await db.query("SELECT COUNT(*) as count FROM properties WHERE verified = FALSE");
+    const [total] = await db.query("SELECT COUNT(*) as count FROM properties");
+    const [active] = await db.query(
+      "SELECT COUNT(*) as count FROM properties WHERE status = 'active'",
+    );
+    const [pending] = await db.query(
+      "SELECT COUNT(*) as count FROM properties WHERE status = 'pending'",
+    );
+    const [sold] = await db.query(
+      "SELECT COUNT(*) as count FROM properties WHERE status = 'sold'",
+    );
+    const [rented] = await db.query(
+      "SELECT COUNT(*) as count FROM properties WHERE status = 'rented'",
+    );
+    const [inactive] = await db.query(
+      "SELECT COUNT(*) as count FROM properties WHERE status = 'inactive'",
+    );
+    const [suspended] = await db.query(
+      "SELECT COUNT(*) as count FROM properties WHERE status = 'suspended'",
+    );
+    const [verified] = await db.query(
+      "SELECT COUNT(*) as count FROM properties WHERE verified = TRUE",
+    );
+    const [unverified] = await db.query(
+      "SELECT COUNT(*) as count FROM properties WHERE verified = FALSE",
+    );
 
     // Type distribution
     const [types] = await db.query(`
@@ -71,7 +87,9 @@ router.get('/stats', async (req, res) => {
         GROUP BY listing_type
       `);
       listings = listingRows;
-    } catch(e) { /* listing_type column may not exist */ }
+    } catch (e) {
+      /* listing_type column may not exist */
+    }
 
     // Monthly Revenue (from agreements)
     const [revenue] = await db.query(`
@@ -114,19 +132,18 @@ router.get('/stats', async (req, res) => {
       typeDistribution: types,
       listingDistribution: listings,
       monthlyRevenue: revenue,
-      brokerPerformance: performance
+      brokerPerformance: performance,
     });
-
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
-
 // Get owner properties
-router.get('/owner/:userId', async (req, res) => {
+router.get("/owner/:userId", async (req, res) => {
   try {
-    const [properties] = await db.query(`
+    const [properties] = await db.query(
+      `
       SELECT p.*, b.name as broker_name,
         (SELECT COUNT(*) FROM property_images WHERE property_id = p.id) as image_count,
         (SELECT image_url FROM property_images WHERE property_id = p.id AND image_type = 'main' LIMIT 1) as main_image
@@ -134,15 +151,17 @@ router.get('/owner/:userId', async (req, res) => {
       LEFT JOIN users b ON p.broker_id = b.id AND b.role = 'broker'
       WHERE p.owner_id = ?
       ORDER BY p.created_at DESC
-    `, [req.params.userId]);
+    `,
+      [req.params.userId],
+    );
     res.json(properties);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Get pending verification properties
-router.get('/pending-verification', async (req, res) => {
+router.get("/pending-verification", async (req, res) => {
   try {
     const [properties] = await db.query(`
       SELECT p.*, u.name as owner_name, u.email as owner_email,
@@ -157,12 +176,12 @@ router.get('/pending-verification', async (req, res) => {
     `);
     res.json(properties);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Get all properties with their verification status (for admin view)
-router.get('/all-with-status', async (req, res) => {
+router.get("/all-with-status", async (req, res) => {
   try {
     const [properties] = await db.query(`
       SELECT p.*, u.name as owner_name, b.name as broker_name,
@@ -179,12 +198,12 @@ router.get('/all-with-status', async (req, res) => {
     `);
     res.json(properties);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Get property recommendations for user
-router.get('/recommendations/:userId', async (req, res) => {
+router.get("/recommendations/:userId", async (req, res) => {
   try {
     const [properties] = await db.query(`
       SELECT DISTINCT p.*,
@@ -196,38 +215,38 @@ router.get('/recommendations/:userId', async (req, res) => {
     `);
     res.json(properties);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Verify property (Approve / Reject / Suspend)
-router.put('/:id/verify', async (req, res) => {
+router.put("/:id/verify", async (req, res) => {
   try {
     const { status, verified_by, notes } = req.body;
-    let propertyStatus = 'active';
+    let propertyStatus = "active";
     let verified = true;
 
-    if (status === 'rejected') {
-      propertyStatus = 'inactive';
+    if (status === "rejected") {
+      propertyStatus = "inactive";
       verified = false;
-    } else if (status === 'suspended') {
-      propertyStatus = 'suspended';
+    } else if (status === "suspended") {
+      propertyStatus = "suspended";
       verified = false;
-    } else if (status === 'approved' || status === 'verified') {
-      propertyStatus = 'active';
+    } else if (status === "approved" || status === "verified") {
+      propertyStatus = "active";
       verified = true;
     }
 
     // Update property status and verified flag
     await db.query(
-      'UPDATE properties SET verified = ?, status = ?, verification_date = NOW() WHERE id = ?',
-      [verified, propertyStatus, req.params.id]
+      "UPDATE properties SET verified = ?, status = ?, verification_date = NOW() WHERE id = ?",
+      [verified, propertyStatus, req.params.id],
     );
 
     // Check if verification record exists
     const [existingVerification] = await db.query(
-      'SELECT id FROM property_verification WHERE property_id = ?',
-      [req.params.id]
+      "SELECT id FROM property_verification WHERE property_id = ?",
+      [req.params.id],
     );
 
     if (existingVerification.length > 0) {
@@ -236,116 +255,204 @@ router.put('/:id/verify', async (req, res) => {
         `UPDATE property_verification 
          SET verification_status = ?, verification_notes = ?, verified_by = ?, verified_at = NOW()
          WHERE property_id = ?`,
-        [status, notes, verified_by, req.params.id]
+        [status, notes, verified_by, req.params.id],
       );
     } else {
       // Create new verification record
       await db.query(
         `INSERT INTO property_verification (property_id, verification_status, verification_notes, verified_by, verified_at)
          VALUES (?, ?, ?, ?, NOW())`,
-        [req.params.id, status, notes, verified_by]
+        [req.params.id, status, notes, verified_by],
       );
     }
 
-    res.json({ message: `Property ${status} successfully`, status: propertyStatus });
+    res.json({
+      message: `Property ${status} successfully`,
+      status: propertyStatus,
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Get property by ID (with images)
-router.get('/:id', async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
-    const [property] = await db.query(`
+    const [property] = await db.query(
+      `
       SELECT p.*, b.name as broker_name, u.name as owner_name,
         (SELECT COUNT(*) FROM property_images WHERE property_id = p.id) as image_count
       FROM properties p
       LEFT JOIN users b ON p.broker_id = b.id AND b.role = 'broker'
       LEFT JOIN users u ON p.owner_id = u.id
       WHERE p.id = ?
-    `, [req.params.id]);
+    `,
+      [req.params.id],
+    );
 
     if (property.length === 0) {
-      return res.status(404).json({ message: 'Property not found' });
+      return res.status(404).json({ message: "Property not found" });
     }
 
     // Also get images
     const [images] = await db.query(
-      'SELECT * FROM property_images WHERE property_id = ? ORDER BY image_type, created_at',
-      [req.params.id]
+      "SELECT * FROM property_images WHERE property_id = ? ORDER BY image_type, created_at",
+      [req.params.id],
     );
 
     // Get verification status
     const [verification] = await db.query(
-      'SELECT * FROM property_verification WHERE property_id = ? ORDER BY created_at DESC LIMIT 1',
-      [req.params.id]
+      "SELECT * FROM property_verification WHERE property_id = ? ORDER BY created_at DESC LIMIT 1",
+      [req.params.id],
     );
 
     res.json({
       ...property[0],
       images: images,
-      verification: verification[0] || null
+      verification: verification[0] || null,
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Create property
-router.post('/', async (req, res) => {
+router.post("/", async (req, res) => {
   try {
     const {
-      title, description, price, location, type, status, broker_id, owner_id,
-      bedrooms, bathrooms, area, listing_type, address, city, state, zip_code, features
+      title,
+      description,
+      price,
+      location,
+      latitude,
+      longitude,
+      type,
+      status,
+      broker_id,
+      owner_id,
+      bedrooms,
+      bathrooms,
+      area,
+      listing_type,
+      address,
+      city,
+      state,
+      zip_code,
+      features,
     } = req.body;
+
+    // Validate lat/lng if provided
+    if (
+      latitude !== undefined &&
+      latitude !== "" &&
+      (isNaN(parseFloat(latitude)) ||
+        parseFloat(latitude) < -90 ||
+        parseFloat(latitude) > 90)
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Invalid latitude. Must be between -90 and 90." });
+    }
+    if (
+      longitude !== undefined &&
+      longitude !== "" &&
+      (isNaN(parseFloat(longitude)) ||
+        parseFloat(longitude) < -180 ||
+        parseFloat(longitude) > 180)
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Invalid longitude. Must be between -180 and 180." });
+    }
 
     const [result] = await db.query(
       `INSERT INTO properties (
-        title, description, price, location, type, status, broker_id, owner_id, 
+        title, description, price, location, latitude, longitude, type, status, broker_id, owner_id, 
         bedrooms, bathrooms, area, address, city, state, zip_code, features
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        title, description, price, location, type, status || 'pending', broker_id || null, owner_id || null,
-        bedrooms || null, bathrooms || null, area || null,
-        address || null, city || null, state || null, zip_code || null,
-        features ? JSON.stringify(features) : null
-      ]
+        title,
+        description,
+        price,
+        location,
+        latitude !== undefined && latitude !== "" ? parseFloat(latitude) : null,
+        longitude !== undefined && longitude !== ""
+          ? parseFloat(longitude)
+          : null,
+        type,
+        status || "pending",
+        broker_id || null,
+        owner_id || null,
+        bedrooms || null,
+        bathrooms || null,
+        area || null,
+        address || null,
+        city || null,
+        state || null,
+        zip_code || null,
+        features ? JSON.stringify(features) : null,
+      ],
     );
 
     // Create a verification record for the new property
     await db.query(
-      'INSERT INTO property_verification (property_id, verification_status) VALUES (?, ?)',
-      [result.insertId, 'pending']
+      "INSERT INTO property_verification (property_id, verification_status) VALUES (?, ?)",
+      [result.insertId, "pending"],
     );
 
-    res.status(201).json({ id: result.insertId, message: 'Property created successfully' });
+    res
+      .status(201)
+      .json({ id: result.insertId, message: "Property created successfully" });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Update property
-router.put('/:id', async (req, res) => {
+router.put("/:id", async (req, res) => {
   try {
-    const { title, description, price, location, type, status, broker_id, bedrooms, bathrooms, area } = req.body;
+    const {
+      title,
+      description,
+      price,
+      location,
+      type,
+      status,
+      broker_id,
+      bedrooms,
+      bathrooms,
+      area,
+    } = req.body;
     await db.query(
       `UPDATE properties SET title = ?, description = ?, price = ?, location = ?, type = ?, 
        status = ?, broker_id = ?, bedrooms = ?, bathrooms = ?, area = ? WHERE id = ?`,
-      [title, description, price, location, type, status, broker_id, bedrooms, bathrooms, area, req.params.id]
+      [
+        title,
+        description,
+        price,
+        location,
+        type,
+        status,
+        broker_id,
+        bedrooms,
+        bathrooms,
+        area,
+        req.params.id,
+      ],
     );
-    res.json({ message: 'Property updated successfully' });
+    res.json({ message: "Property updated successfully" });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Delete property
-router.delete('/:id', async (req, res) => {
+router.delete("/:id", async (req, res) => {
   try {
-    await db.query('DELETE FROM properties WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Property deleted successfully' });
+    await db.query("DELETE FROM properties WHERE id = ?", [req.params.id]);
+    res.json({ message: "Property deleted successfully" });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 

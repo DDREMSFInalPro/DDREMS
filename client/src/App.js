@@ -1,40 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import './App.css';
-import Sidebar from './components/Sidebar';
-import Dashboard from './components/Dashboard';
-import Properties from './components/Properties';
-import Brokers from './components/Brokers';
-import Users from './components/Users';
-import Transactions from './components/Transactions';
-import Announcements from './components/Announcements';
-import Reports from './components/Reports';
-import Messages from './components/Messages';
-import SendMessage from './components/SendMessage';
-import AgentDashboard from './components/AgentDashboardEnhanced';
-import OwnerDashboard from './components/OwnerDashboardEnhanced';
-import CustomerDashboard from './components/CustomerDashboardEnhanced';
-import PropertyAdminDashboard from './components/PropertyAdminDashboard';
-import SystemAdminDashboard from './components/SystemAdminDashboard';
-import Agreements from './components/Agreements';
-import CommissionTracking from './components/CommissionTracking';
-import CustomerProfile from './components/profiles/CustomerProfile';
-import OwnerProfile from './components/profiles/OwnerProfile';
-import BrokerProfile from './components/profiles/BrokerProfile';
-import BrokerRequests from './components/BrokerRequests';
-import KeyRequests from './components/KeyRequests';
-import AIPricePredictor from './components/AIPricePredictor';
-import Login from './components/Login';
-
+import React, { useState, useEffect } from "react";
+import "./App.css";
+import Sidebar from "./components/Sidebar";
+import Dashboard from "./components/Dashboard";
+import Properties from "./components/Properties";
+import Brokers from "./components/Brokers";
+import Users from "./components/Users";
+import Transactions from "./components/Transactions";
+import Announcements from "./components/Announcements";
+import Reports from "./components/Reports";
+import Messages from "./components/Messages";
+import SendMessage from "./components/SendMessage";
+import AgentDashboard from "./components/AgentDashboardEnhanced";
+import OwnerDashboard from "./components/OwnerDashboardEnhanced";
+import CustomerDashboard from "./components/CustomerDashboardEnhanced";
+import PropertyAdminDashboard from "./components/PropertyAdminDashboard";
+import SystemAdminDashboard from "./components/SystemAdminDashboard";
+import Agreements from "./components/Agreements";
+import CommissionTracking from "./components/CommissionTracking";
+import CustomerProfile from "./components/profiles/CustomerProfile";
+import OwnerProfile from "./components/profiles/OwnerProfile";
+import BrokerProfile from "./components/profiles/BrokerProfile";
+import BrokerRequests from "./components/BrokerRequests";
+import KeyRequests from "./components/KeyRequests";
+import AIPricePredictor from "./components/AIPricePredictor";
+import Favorites from "./components/Favorites";
+import AgreementWorkflow from "./components/AgreementWorkflow";
+import Login from "./components/Login";
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [currentPage, setCurrentPage] = useState("dashboard");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
+    const token = localStorage.getItem("token");
+    const userData = localStorage.getItem("user");
     if (token && userData) {
       setIsAuthenticated(true);
       setUser(JSON.parse(userData));
@@ -42,18 +43,18 @@ function App() {
   }, []);
 
   const handleLogin = (token, userData) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(userData));
     setIsAuthenticated(true);
     setUser(userData);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
     setIsAuthenticated(false);
     setUser(null);
-    setCurrentPage('dashboard');
+    setCurrentPage("dashboard");
   };
 
   if (!isAuthenticated) {
@@ -62,19 +63,43 @@ function App() {
 
   const renderDashboard = () => {
     // Role-based dashboard rendering
-    if (currentPage === 'dashboard') {
+    if (currentPage === "dashboard") {
       switch (user.role) {
-        case 'broker':
-          return <AgentDashboard user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />;
-        case 'owner':
+        case "broker":
+          return (
+            <AgentDashboard
+              user={user}
+              onLogout={handleLogout}
+              setCurrentPage={setCurrentPage}
+            />
+          );
+        case "owner":
           return <OwnerDashboard user={user} onLogout={handleLogout} />;
-        case 'user':
-          return <CustomerDashboard user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />;
-        case 'property_admin':
-          return <PropertyAdminDashboard user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />;
-        case 'system_admin':
-          return <SystemAdminDashboard user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />;
-        case 'admin':
+        case "user":
+          return (
+            <CustomerDashboard
+              user={user}
+              onLogout={handleLogout}
+              setCurrentPage={setCurrentPage}
+            />
+          );
+        case "property_admin":
+          return (
+            <PropertyAdminDashboard
+              user={user}
+              onLogout={handleLogout}
+              setCurrentPage={setCurrentPage}
+            />
+          );
+        case "system_admin":
+          return (
+            <SystemAdminDashboard
+              user={user}
+              onLogout={handleLogout}
+              setCurrentPage={setCurrentPage}
+            />
+          );
+        case "admin":
         default:
           return <Dashboard user={user} onLogout={handleLogout} />;
       }
@@ -82,65 +107,99 @@ function App() {
 
     // Other pages
     switch (currentPage) {
-      case 'properties':
-        return <Properties user={user} onLogout={handleLogout} />;
-      case 'browse-properties':
-        return <Properties user={user} onLogout={handleLogout} />;
-      case 'brokers':
+      case "properties":
+        return <Properties user={user} onLogout={handleLogout} viewMode="my" />;
+      case "browse-properties":
+        return (
+          <Properties user={user} onLogout={handleLogout} viewMode="all" />
+        );
+      case "brokers":
         return <Brokers user={user} onLogout={handleLogout} />;
-      case 'users':
+      case "users":
         return <Users user={user} onLogout={handleLogout} />;
-      case 'users-brokers':
-        return <Users user={user} onLogout={handleLogout} initialRole="broker" />;
-      case 'users-customers':
+      case "users-brokers":
+        return (
+          <Users user={user} onLogout={handleLogout} initialRole="broker" />
+        );
+      case "users-customers":
         return <Users user={user} onLogout={handleLogout} initialRole="user" />;
-      case 'users-owners':
-        return <Users user={user} onLogout={handleLogout} initialRole="owner" />;
-      case 'users-admins':
-        return <Users user={user} onLogout={handleLogout} initialRole="property_admin" />;
-      case 'transactions':
+      case "users-owners":
+        return (
+          <Users user={user} onLogout={handleLogout} initialRole="owner" />
+        );
+      case "users-admins":
+        return (
+          <Users
+            user={user}
+            onLogout={handleLogout}
+            initialRole="property_admin"
+          />
+        );
+      case "transactions":
         return <Transactions user={user} onLogout={handleLogout} />;
-      case 'announcements':
+      case "announcements":
         return <Announcements user={user} onLogout={handleLogout} />;
-      case 'messages':
+      case "messages":
         return <Messages user={user} onLogout={handleLogout} />;
-      case 'send-message':
+      case "send-message":
         return <SendMessage user={user} onLogout={handleLogout} />;
-      case 'commission':
+      case "commission":
         return <CommissionTracking user={user} onLogout={handleLogout} />;
-      case 'agreements':
+      case "agreements":
         return <Agreements user={user} onLogout={handleLogout} />;
-      case 'documents':
-        if (user.role === 'property_admin') {
-          return <PropertyAdminDashboard user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} initialView="documents" />;
+      case "documents":
+        if (user.role === "property_admin") {
+          return (
+            <PropertyAdminDashboard
+              user={user}
+              onLogout={handleLogout}
+              setCurrentPage={setCurrentPage}
+              initialView="documents"
+            />
+          );
         }
         return <Dashboard user={user} onLogout={handleLogout} />;
-      case 'agreement-requests':
-        if (user.role === 'property_admin') {
-          return <PropertyAdminDashboard user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} initialView="agreement-requests" />;
+      case "agreement-requests":
+        if (user.role === "property_admin") {
+          return (
+            <PropertyAdminDashboard
+              user={user}
+              onLogout={handleLogout}
+              setCurrentPage={setCurrentPage}
+              initialView="agreement-requests"
+            />
+          );
         }
         return <Dashboard user={user} onLogout={handleLogout} />;
-      case 'key-requests':
+      case "key-requests":
         return <KeyRequests user={user} />;
-      case 'requests':
+      case "favorites":
+        return <Favorites user={user} onLogout={handleLogout} />;
+      case "requests":
         return <BrokerRequests user={user} onLogout={handleLogout} />;
-      case 'ai-predictor':
+      case "ai-predictor":
         return <AIPricePredictor user={user} onLogout={handleLogout} />;
-      case 'profile':
-        if (user.role === 'user') return <CustomerProfile user={user} onLogout={handleLogout} />;
-        if (user.role === 'owner') return <OwnerProfile user={user} onLogout={handleLogout} />;
-        if (user.role === 'broker') return <BrokerProfile user={user} onLogout={handleLogout} />;
+      case "agreement-workflow":
+        return <AgreementWorkflow user={user} onLogout={handleLogout} />;
+      case "profile":
+        if (user.role === "user")
+          return <CustomerProfile user={user} onLogout={handleLogout} />;
+        if (user.role === "owner")
+          return <OwnerProfile user={user} onLogout={handleLogout} />;
+        if (user.role === "broker")
+          return <BrokerProfile user={user} onLogout={handleLogout} />;
         return <Dashboard user={user} onLogout={handleLogout} />;
       default:
         return <Dashboard user={user} onLogout={handleLogout} />;
     }
-
   };
 
-  const showSidebar = currentPage !== 'reports' || ['admin', 'system_admin', 'property_admin'].includes(user?.role);
+  const showSidebar =
+    currentPage !== "reports" ||
+    ["admin", "system_admin", "property_admin"].includes(user?.role);
 
   return (
-    <div className={`App ${!showSidebar ? 'no-sidebar' : ''}`}>
+    <div className={`App ${!showSidebar ? "no-sidebar" : ""}`}>
       {showSidebar && (
         <Sidebar
           currentPage={currentPage}
@@ -151,9 +210,15 @@ function App() {
           setIsCollapsed={setIsSidebarCollapsed}
         />
       )}
-      <div className={`main-content ${isSidebarCollapsed && showSidebar ? 'sidebar-collapsed' : ''}`}>
-        {currentPage === 'reports' ? (
-          <Reports user={user} onLogout={handleLogout} onBack={() => setCurrentPage('dashboard')} />
+      <div
+        className={`main-content ${isSidebarCollapsed && showSidebar ? "sidebar-collapsed" : ""}`}
+      >
+        {currentPage === "reports" ? (
+          <Reports
+            user={user}
+            onLogout={handleLogout}
+            onBack={() => setCurrentPage("dashboard")}
+          />
         ) : (
           renderDashboard()
         )}
@@ -161,6 +226,5 @@ function App() {
     </div>
   );
 }
-
 
 export default App;

@@ -1,11 +1,22 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const db = require('../config/db');
+const db = require("../config/db");
 
 // Helper: Generate agreement HTML document
-function generateAgreementHTML(agreement, property, owner, customer, ownerDocs, customerDocs) {
-  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  
+function generateAgreementHTML(
+  agreement,
+  property,
+  owner,
+  customer,
+  ownerDocs,
+  customerDocs,
+) {
+  const today = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
   return `
 <!DOCTYPE html>
 <html>
@@ -61,12 +72,12 @@ function generateAgreementHTML(agreement, property, owner, customer, ownerDocs, 
   <div class="section">
     <h3 class="section-title">📋 Property Information</h3>
     <div class="info-grid">
-      <div class="info-item"><label>Property Title</label><span>${property.title || 'N/A'}</span></div>
-      <div class="info-item"><label>Location</label><span>${property.location || 'N/A'}</span></div>
-      <div class="info-item"><label>Type</label><span>${(property.type || 'N/A').charAt(0).toUpperCase() + (property.type || '').slice(1)}</span></div>
+      <div class="info-item"><label>Property Title</label><span>${property.title || "N/A"}</span></div>
+      <div class="info-item"><label>Location</label><span>${property.location || "N/A"}</span></div>
+      <div class="info-item"><label>Type</label><span>${(property.type || "N/A").charAt(0).toUpperCase() + (property.type || "").slice(1)}</span></div>
       <div class="info-item"><label>Price</label><span>${Number(property.price || 0).toLocaleString()} ETB</span></div>
-      <div class="info-item"><label>Area</label><span>${property.area ? property.area + ' sqm' : 'N/A'}</span></div>
-      <div class="info-item"><label>Status</label><span>${(property.status || 'N/A').charAt(0).toUpperCase() + (property.status || '').slice(1)}</span></div>
+      <div class="info-item"><label>Area</label><span>${property.area ? property.area + " sqm" : "N/A"}</span></div>
+      <div class="info-item"><label>Status</label><span>${(property.status || "N/A").charAt(0).toUpperCase() + (property.status || "").slice(1)}</span></div>
     </div>
   </div>
 
@@ -75,15 +86,15 @@ function generateAgreementHTML(agreement, property, owner, customer, ownerDocs, 
     <div class="info-grid">
       <div class="party-box">
         <h4>🏠 Property Owner</h4>
-        <p><strong>Name:</strong> ${owner.name || 'N/A'}</p>
-        <p><strong>Email:</strong> ${owner.email || 'N/A'}</p>
-        <p><strong>Phone:</strong> ${owner.phone || 'N/A'}</p>
+        <p><strong>Name:</strong> ${owner.name || "N/A"}</p>
+        <p><strong>Email:</strong> ${owner.email || "N/A"}</p>
+        <p><strong>Phone:</strong> ${owner.phone || "N/A"}</p>
       </div>
       <div class="party-box">
         <h4>🙋 Customer / Buyer</h4>
-        <p><strong>Name:</strong> ${customer.name || 'N/A'}</p>
-        <p><strong>Email:</strong> ${customer.email || 'N/A'}</p>
-        <p><strong>Phone:</strong> ${customer.phone || 'N/A'}</p>
+        <p><strong>Name:</strong> ${customer.name || "N/A"}</p>
+        <p><strong>Email:</strong> ${customer.email || "N/A"}</p>
+        <p><strong>Phone:</strong> ${customer.phone || "N/A"}</p>
       </div>
     </div>
   </div>
@@ -94,17 +105,29 @@ function generateAgreementHTML(agreement, property, owner, customer, ownerDocs, 
       <div>
         <h4 style="font-size:13px;color:#374151;margin-bottom:8px;">Owner Documents</h4>
         <ul class="documents-list">
-          ${ownerDocs.length > 0 
-            ? ownerDocs.map(d => `<li>${d.document_name} (${d.document_type})</li>`).join('')
-            : '<li style="color:#9ca3af;">No documents uploaded</li>'}
+          ${
+            ownerDocs.length > 0
+              ? ownerDocs
+                  .map(
+                    (d) => `<li>${d.document_name} (${d.document_type})</li>`,
+                  )
+                  .join("")
+              : '<li style="color:#9ca3af;">No documents uploaded</li>'
+          }
         </ul>
       </div>
       <div>
         <h4 style="font-size:13px;color:#374151;margin-bottom:8px;">Customer Documents</h4>
         <ul class="documents-list">
-          ${customerDocs.length > 0 
-            ? customerDocs.map(d => `<li>${d.document_name} (${d.document_type})</li>`).join('')
-            : '<li style="color:#9ca3af;">No documents uploaded</li>'}
+          ${
+            customerDocs.length > 0
+              ? customerDocs
+                  .map(
+                    (d) => `<li>${d.document_name} (${d.document_type})</li>`,
+                  )
+                  .join("")
+              : '<li style="color:#9ca3af;">No documents uploaded</li>'
+          }
         </ul>
       </div>
     </div>
@@ -112,7 +135,7 @@ function generateAgreementHTML(agreement, property, owner, customer, ownerDocs, 
 
   <div class="section">
     <h3 class="section-title">📝 Agreement Terms</h3>
-    <div class="terms-text">${agreement.agreement_text || agreement.terms || 'Terms to be specified.'}</div>
+    <div class="terms-text">${agreement.agreement_text || agreement.terms || "Terms to be specified."}</div>
   </div>
 
   <div class="section">
@@ -120,23 +143,23 @@ function generateAgreementHTML(agreement, property, owner, customer, ownerDocs, 
     <div class="info-grid">
       <div class="info-item">
         <label>Agreement Duration</label>
-        <div class="fillable-field" data-field="duration">${agreement.duration || ''}</div>
+        <div class="fillable-field" data-field="duration">${agreement.duration || ""}</div>
       </div>
       <div class="info-item">
         <label>Payment Terms</label>
-        <div class="fillable-field" data-field="payment_terms">${agreement.payment_terms || ''}</div>
+        <div class="fillable-field" data-field="payment_terms">${agreement.payment_terms || ""}</div>
       </div>
     </div>
     <div style="margin-top:12px;">
       <div class="info-item">
         <label>Special Conditions</label>
-        <div class="fillable-area" data-field="special_conditions">${agreement.special_conditions || ''}</div>
+        <div class="fillable-area" data-field="special_conditions">${agreement.special_conditions || ""}</div>
       </div>
     </div>
     <div style="margin-top:12px;">
       <div class="info-item">
         <label>Additional Terms</label>
-        <div class="fillable-area" data-field="additional_terms">${agreement.additional_terms || ''}</div>
+        <div class="fillable-area" data-field="additional_terms">${agreement.additional_terms || ""}</div>
       </div>
     </div>
   </div>
@@ -145,22 +168,26 @@ function generateAgreementHTML(agreement, property, owner, customer, ownerDocs, 
     <div class="signature-box">
       <h4>Owner Signature</h4>
       <div class="signature-line">
-        ${agreement.owner_signature 
-          ? `<img src="${agreement.owner_signature}" alt="Owner Signature" />`
-          : 'Sign here'}
+        ${
+          agreement.owner_signature
+            ? `<img src="${agreement.owner_signature}" alt="Owner Signature" />`
+            : "Sign here"
+        }
       </div>
-      <div class="signature-name">${owner.name || '________________'}</div>
-      <div class="signature-date">${agreement.owner_signed_at ? new Date(agreement.owner_signed_at).toLocaleDateString() : 'Date: ___________'}</div>
+      <div class="signature-name">${owner.name || "________________"}</div>
+      <div class="signature-date">${agreement.owner_signed_at ? new Date(agreement.owner_signed_at).toLocaleDateString() : "Date: ___________"}</div>
     </div>
     <div class="signature-box">
       <h4>Customer Signature</h4>
       <div class="signature-line">
-        ${agreement.customer_signature 
-          ? `<img src="${agreement.customer_signature}" alt="Customer Signature" />`
-          : 'Sign here'}
+        ${
+          agreement.customer_signature
+            ? `<img src="${agreement.customer_signature}" alt="Customer Signature" />`
+            : "Sign here"
+        }
       </div>
-      <div class="signature-name">${customer.name || '________________'}</div>
-      <div class="signature-date">${agreement.customer_signed_at ? new Date(agreement.customer_signed_at).toLocaleDateString() : 'Date: ___________'}</div>
+      <div class="signature-name">${customer.name || "________________"}</div>
+      <div class="signature-date">${agreement.customer_signed_at ? new Date(agreement.customer_signed_at).toLocaleDateString() : "Date: ___________"}</div>
     </div>
   </div>
 
@@ -173,9 +200,10 @@ function generateAgreementHTML(agreement, property, owner, customer, ownerDocs, 
 }
 
 // Get single agreement with full details
-router.get('/:id', async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
-    const [agreements] = await db.query(`
+    const [agreements] = await db.query(
+      `
       SELECT a.*, p.title as property_title, p.location as property_location, 
              p.price as property_price, p.type as property_type, p.area as property_area, p.status as property_status,
              owner.name as owner_name, owner.email as owner_email, owner.phone as owner_phone,
@@ -185,23 +213,28 @@ router.get('/:id', async (req, res) => {
       LEFT JOIN users owner ON a.owner_id = owner.id
       LEFT JOIN users cust ON a.customer_id = cust.id
       WHERE a.id = ?
-    `, [req.params.id]);
+    `,
+      [req.params.id],
+    );
 
     if (agreements.length === 0) {
-      return res.status(404).json({ message: 'Agreement not found', success: false });
+      return res
+        .status(404)
+        .json({ message: "Agreement not found", success: false });
     }
 
     res.json({ agreement: agreements[0], success: true });
   } catch (error) {
-    console.error('Get agreement error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("Get agreement error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Get owner agreements
-router.get('/owner/:userId', async (req, res) => {
+router.get("/owner/:userId", async (req, res) => {
   try {
-    const [agreements] = await db.query(`
+    const [agreements] = await db.query(
+      `
       SELECT a.*, p.title as property_title, p.location as property_location, p.price as property_price,
              cust.name as customer_name, cust.email as customer_email
       FROM agreements a
@@ -209,18 +242,21 @@ router.get('/owner/:userId', async (req, res) => {
       LEFT JOIN users cust ON a.customer_id = cust.id
       WHERE a.owner_id = ?
       ORDER BY a.created_at DESC
-    `, [req.params.userId]);
+    `,
+      [req.params.userId],
+    );
     res.json(agreements);
   } catch (error) {
-    console.error('Get owner agreements error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("Get owner agreements error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Get broker agreements
-router.get('/broker/:userId', async (req, res) => {
+router.get("/broker/:userId", async (req, res) => {
   try {
-    const [agreements] = await db.query(`
+    const [agreements] = await db.query(
+      `
       SELECT a.*, p.title as property_title, p.location as property_location, p.price as property_price,
              cust.name as customer_name, cust.email as customer_email
       FROM agreements a
@@ -228,18 +264,21 @@ router.get('/broker/:userId', async (req, res) => {
       LEFT JOIN users cust ON a.customer_id = cust.id
       WHERE a.broker_id = ?
       ORDER BY a.created_at DESC
-    `, [req.params.userId]);
+    `,
+      [req.params.userId],
+    );
     res.json(agreements);
   } catch (error) {
-    console.error('Get broker agreements error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("Get broker agreements error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Get customer agreements
-router.get('/customer/:userId', async (req, res) => {
+router.get("/customer/:userId", async (req, res) => {
   try {
-    const [agreements] = await db.query(`
+    const [agreements] = await db.query(
+      `
       SELECT a.*, p.title as property_title, p.location as property_location, p.price as property_price,
              owner.name as owner_name, owner.email as owner_email
       FROM agreements a
@@ -247,154 +286,268 @@ router.get('/customer/:userId', async (req, res) => {
       LEFT JOIN users owner ON a.owner_id = owner.id
       WHERE a.customer_id = ?
       ORDER BY a.created_at DESC
-    `, [req.params.userId]);
+    `,
+      [req.params.userId],
+    );
     res.json(agreements);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Create agreement
-router.post('/', async (req, res) => {
+router.post("/", async (req, res) => {
   try {
-    const { property_id, owner_id, customer_id, broker_id, agreement_text, status } = req.body;
+    const {
+      property_id,
+      owner_id,
+      customer_id,
+      broker_id,
+      agreement_text,
+      status,
+    } = req.body;
     const [result] = await db.query(
-      'INSERT INTO agreements (property_id, owner_id, customer_id, broker_id, agreement_text, status) VALUES (?, ?, ?, ?, ?, ?)',
-      [property_id, owner_id, customer_id, broker_id || null, agreement_text, status || 'pending']
+      "INSERT INTO agreements (property_id, owner_id, customer_id, broker_id, agreement_text, status) VALUES (?, ?, ?, ?, ?, ?)",
+      [
+        property_id,
+        owner_id,
+        customer_id,
+        broker_id || null,
+        agreement_text,
+        status || "pending",
+      ],
     );
-    res.status(201).json({ id: result.insertId, message: 'Agreement created successfully' });
+    res
+      .status(201)
+      .json({ id: result.insertId, message: "Agreement created successfully" });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Generate agreement document
-router.post('/:id/generate-document', async (req, res) => {
+router.post("/:id/generate-document", async (req, res) => {
   try {
     const agreementId = req.params.id;
 
     // Get agreement with full details
-    const [agreements] = await db.query(`
+    const [agreements] = await db.query(
+      `
       SELECT a.*, p.title, p.location, p.price, p.type, p.area, p.status as property_status,
              p.id as prop_id
       FROM agreements a
       JOIN properties p ON a.property_id = p.id
       WHERE a.id = ?
-    `, [agreementId]);
+    `,
+      [agreementId],
+    );
 
     if (agreements.length === 0) {
-      return res.status(404).json({ message: 'Agreement not found', success: false });
+      return res
+        .status(404)
+        .json({ message: "Agreement not found", success: false });
     }
 
     const agreement = agreements[0];
     const customerId = agreement.customer_id;
 
     // Get owner and customer info
-    const [owners] = await db.query('SELECT name, email, phone FROM users WHERE id = ?', [agreement.owner_id]);
-    const [customers] = await db.query('SELECT name, email, phone FROM users WHERE id = ?', [customerId]);
+    const [owners] = await db.query(
+      "SELECT name, email, phone FROM users WHERE id = ?",
+      [agreement.owner_id],
+    );
+    const [customers] = await db.query(
+      "SELECT name, email, phone FROM users WHERE id = ?",
+      [customerId],
+    );
 
-    const owner = owners.length > 0 ? owners[0] : { name: 'N/A', email: 'N/A', phone: 'N/A' };
-    const customer = customers.length > 0 ? customers[0] : { name: 'N/A', email: 'N/A', phone: 'N/A' };
+    const owner =
+      owners.length > 0
+        ? owners[0]
+        : { name: "N/A", email: "N/A", phone: "N/A" };
+    const customer =
+      customers.length > 0
+        ? customers[0]
+        : { name: "N/A", email: "N/A", phone: "N/A" };
 
     // Get property documents (owner side)
     const [ownerDocs] = await db.query(
-      'SELECT document_name, document_type FROM property_documents WHERE property_id = ?',
-      [agreement.prop_id]
+      "SELECT document_name, document_type FROM property_documents WHERE property_id = ?",
+      [agreement.prop_id],
     );
 
     // Customer documents (from customer profile)
     let customerDocs = [];
     try {
       const [custProfile] = await db.query(
-        'SELECT id_document FROM customer_profiles WHERE user_id = ?',
-        [customerId]
+        "SELECT id_document FROM customer_profiles WHERE user_id = ?",
+        [customerId],
       );
       if (custProfile.length > 0 && custProfile[0].id_document) {
-        customerDocs.push({ document_name: 'ID Document', document_type: 'identification' });
+        customerDocs.push({
+          document_name: "ID Document",
+          document_type: "identification",
+        });
       }
-    } catch (e) { /* table may not exist */ }
+    } catch (e) {
+      /* table may not exist */
+    }
+
+    // Fetch the final agreed price from agreement_requests
+    let finalPrice = agreement.price;
+    try {
+      const [agrReq] = await db.query(
+        `SELECT proposed_price FROM agreement_requests
+         WHERE property_id = ? AND (customer_id = ? OR customer_id = ?)
+         AND status IN ('owner_accepted','completed','agreement_generated','buyer_signed','fully_signed','payment_submitted','payment_verified','handover_confirmed')
+         ORDER BY updated_at DESC LIMIT 1`,
+        [agreement.prop_id, agreement.customer_id, agreement.user_id],
+      );
+      if (agrReq.length > 0 && agrReq[0].proposed_price) {
+        finalPrice = agrReq[0].proposed_price;
+      }
+    } catch (e) {
+      /* fallback to property price */
+    }
 
     const property = {
-      title: agreement.title, location: agreement.location, price: agreement.price,
-      type: agreement.type, area: agreement.area, status: agreement.property_status
+      title: agreement.title,
+      location: agreement.location,
+      price: finalPrice,
+      type: agreement.type,
+      area: agreement.area,
+      status: agreement.property_status,
     };
 
     // Generate HTML
-    const html = generateAgreementHTML(agreement, property, owner, customer, ownerDocs, customerDocs);
-
-    // Save to database
+    const html = generateAgreementHTML(
+      agreement,
+      property,
+      owner,
+      customer,
+      ownerDocs,
+      customerDocs,
+    );
     await db.query(
-      'UPDATE agreements SET agreement_html = ?, updated_at = NOW() WHERE id = ?',
-      [html, agreementId]
+      "UPDATE agreements SET agreement_html = ?, updated_at = NOW() WHERE id = ?",
+      [html, agreementId],
     );
 
-    res.json({ 
-      html, 
-      agreement_id: agreementId, 
-      message: 'Agreement document generated successfully',
-      success: true
+    res.json({
+      html,
+      agreement_id: agreementId,
+      message: "Agreement document generated successfully",
+      success: true,
     });
   } catch (error) {
-    console.error('Generate document error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message, success: false });
+    console.error("Generate document error:", error);
+    res
+      .status(500)
+      .json({ message: "Server error", error: error.message, success: false });
   }
 });
 
 // Get agreement document HTML
-router.get('/:id/document', async (req, res) => {
+router.get("/:id/document", async (req, res) => {
   try {
-    const [agreements] = await db.query('SELECT agreement_html FROM agreements WHERE id = ?', [req.params.id]);
+    const [agreements] = await db.query(
+      "SELECT agreement_html FROM agreements WHERE id = ?",
+      [req.params.id],
+    );
     if (agreements.length === 0 || !agreements[0].agreement_html) {
-      return res.status(404).json({ message: 'Agreement document not found. Generate it first.', success: false });
+      return res.status(404).json({
+        message: "Agreement document not found. Generate it first.",
+        success: false,
+      });
     }
     res.json({ html: agreements[0].agreement_html, success: true });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message, success: false });
+    res
+      .status(500)
+      .json({ message: "Server error", error: error.message, success: false });
   }
 });
 
 // Update agreement fillable fields
-router.put('/:id/update-fields', async (req, res) => {
+router.put("/:id/update-fields", async (req, res) => {
   try {
-    const { duration, payment_terms, special_conditions, additional_terms, agreement_text } = req.body;
-    
+    const {
+      duration,
+      payment_terms,
+      special_conditions,
+      additional_terms,
+      agreement_text,
+    } = req.body;
+
     const updates = [];
     const values = [];
-    
-    if (duration !== undefined) { updates.push('duration = ?'); values.push(duration); }
-    if (payment_terms !== undefined) { updates.push('payment_terms = ?'); values.push(payment_terms); }
-    if (special_conditions !== undefined) { updates.push('special_conditions = ?'); values.push(special_conditions); }
-    if (additional_terms !== undefined) { updates.push('additional_terms = ?'); values.push(additional_terms); }
-    if (agreement_text !== undefined) { updates.push('agreement_text = ?'); values.push(agreement_text); }
-    
-    if (updates.length === 0) {
-      return res.status(400).json({ message: 'No fields to update', success: false });
+
+    if (duration !== undefined) {
+      updates.push("duration = ?");
+      values.push(duration);
     }
-    
-    updates.push('updated_at = NOW()');
+    if (payment_terms !== undefined) {
+      updates.push("payment_terms = ?");
+      values.push(payment_terms);
+    }
+    if (special_conditions !== undefined) {
+      updates.push("special_conditions = ?");
+      values.push(special_conditions);
+    }
+    if (additional_terms !== undefined) {
+      updates.push("additional_terms = ?");
+      values.push(additional_terms);
+    }
+    if (agreement_text !== undefined) {
+      updates.push("agreement_text = ?");
+      values.push(agreement_text);
+    }
+
+    if (updates.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "No fields to update", success: false });
+    }
+
+    updates.push("updated_at = NOW()");
     values.push(req.params.id);
-    
-    await db.query(`UPDATE agreements SET ${updates.join(', ')} WHERE id = ?`, values);
-    
-    res.json({ message: 'Agreement fields updated successfully', success: true });
+
+    await db.query(
+      `UPDATE agreements SET ${updates.join(", ")} WHERE id = ?`,
+      values,
+    );
+
+    res.json({
+      message: "Agreement fields updated successfully",
+      success: true,
+    });
   } catch (error) {
-    console.error('Update fields error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message, success: false });
+    console.error("Update fields error:", error);
+    res
+      .status(500)
+      .json({ message: "Server error", error: error.message, success: false });
   }
 });
 
 // Sign agreement (owner or customer)
-router.put('/:id/sign', async (req, res) => {
+router.put("/:id/sign", async (req, res) => {
   try {
     const { user_id, role, signature_data } = req.body;
-    
+
     if (!signature_data) {
-      return res.status(400).json({ message: 'Signature data is required', success: false });
+      return res
+        .status(400)
+        .json({ message: "Signature data is required", success: false });
     }
 
-    const [agreements] = await db.query('SELECT * FROM agreements WHERE id = ?', [req.params.id]);
+    const [agreements] = await db.query(
+      "SELECT * FROM agreements WHERE id = ?",
+      [req.params.id],
+    );
     if (agreements.length === 0) {
-      return res.status(404).json({ message: 'Agreement not found', success: false });
+      return res
+        .status(404)
+        .json({ message: "Agreement not found", success: false });
     }
 
     const agreement = agreements[0];
@@ -402,58 +555,81 @@ router.put('/:id/sign', async (req, res) => {
     const isCustomer = String(agreement.customer_id) === String(user_id);
 
     if (!isOwner && !isCustomer) {
-      return res.status(403).json({ message: 'Only agreement parties can sign', success: false });
+      return res
+        .status(403)
+        .json({ message: "Only agreement parties can sign", success: false });
     }
 
     if (isOwner) {
       await db.query(
-        'UPDATE agreements SET owner_signature = ?, owner_signed_at = NOW(), updated_at = NOW() WHERE id = ?',
-        [signature_data, req.params.id]
+        "UPDATE agreements SET owner_signature = ?, owner_signed_at = NOW(), updated_at = NOW() WHERE id = ?",
+        [signature_data, req.params.id],
       );
     } else {
       await db.query(
-        'UPDATE agreements SET customer_signature = ?, customer_signed_at = NOW(), updated_at = NOW() WHERE id = ?',
-        [signature_data, req.params.id]
+        "UPDATE agreements SET customer_signature = ?, customer_signed_at = NOW(), updated_at = NOW() WHERE id = ?",
+        [signature_data, req.params.id],
       );
     }
 
     // Check if both parties signed — activate the agreement
-    const [updated] = await db.query('SELECT owner_signature, customer_signature FROM agreements WHERE id = ?', [req.params.id]);
+    const [updated] = await db.query(
+      "SELECT owner_signature, customer_signature FROM agreements WHERE id = ?",
+      [req.params.id],
+    );
     if (updated[0].owner_signature && updated[0].customer_signature) {
-      await db.query("UPDATE agreements SET status = 'active', updated_at = NOW() WHERE id = ?", [req.params.id]);
+      await db.query(
+        "UPDATE agreements SET status = 'active', updated_at = NOW() WHERE id = ?",
+        [req.params.id],
+      );
     }
 
     // Notify the other party
     const notifyUserId = isOwner ? agreement.customer_id : agreement.owner_id;
-    const signerName = isOwner ? 'Owner' : 'Customer';
+    const signerName = isOwner ? "Owner" : "Customer";
     if (notifyUserId) {
       await db.query(
-        'INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, ?)',
-        [notifyUserId, 'Agreement Signed', `The ${signerName} has signed agreement #${req.params.id}.`, 'success']
+        "INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, ?)",
+        [
+          notifyUserId,
+          "Agreement Signed",
+          `The ${signerName} has signed agreement #${req.params.id}.`,
+          "success",
+        ],
       );
     }
 
-    res.json({ message: `Agreement signed by ${signerName} successfully`, success: true });
+    res.json({
+      message: `Agreement signed by ${signerName} successfully`,
+      success: true,
+    });
   } catch (error) {
-    console.error('Sign agreement error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message, success: false });
+    console.error("Sign agreement error:", error);
+    res
+      .status(500)
+      .json({ message: "Server error", error: error.message, success: false });
   }
 });
 
 // Send agreement to other party
-router.post('/:id/send', async (req, res) => {
+router.post("/:id/send", async (req, res) => {
   try {
     const { sender_id } = req.body;
 
-    const [agreements] = await db.query(`
+    const [agreements] = await db.query(
+      `
       SELECT a.*, p.title as property_title
       FROM agreements a
       JOIN properties p ON a.property_id = p.id
       WHERE a.id = ?
-    `, [req.params.id]);
+    `,
+      [req.params.id],
+    );
 
     if (agreements.length === 0) {
-      return res.status(404).json({ message: 'Agreement not found', success: false });
+      return res
+        .status(404)
+        .json({ message: "Agreement not found", success: false });
     }
 
     const agreement = agreements[0];
@@ -461,60 +637,90 @@ router.post('/:id/send', async (req, res) => {
     const recipientId = isOwner ? agreement.customer_id : agreement.owner_id;
 
     if (!recipientId) {
-      return res.status(400).json({ message: 'No recipient found', success: false });
+      return res
+        .status(400)
+        .json({ message: "No recipient found", success: false });
     }
 
-    // Create notification 
+    // Create notification
     await db.query(
-      'INSERT INTO notifications (user_id, title, message, type, related_id) VALUES (?, ?, ?, ?, ?)',
-      [recipientId, 'Agreement Document Sent', `An agreement document for "${agreement.property_title}" has been sent to you for review and signing.`, 'info', req.params.id]
+      "INSERT INTO notifications (user_id, title, message, type, related_id) VALUES (?, ?, ?, ?, ?)",
+      [
+        recipientId,
+        "Agreement Document Sent",
+        `An agreement document for "${agreement.property_title}" has been sent to you for review and signing.`,
+        "info",
+        req.params.id,
+      ],
     );
 
     // Also send as a message
-    const [sender] = await db.query('SELECT name FROM users WHERE id = ?', [sender_id]);
+    const [sender] = await db.query("SELECT name FROM users WHERE id = ?", [
+      sender_id,
+    ]);
     await db.query(
-      'INSERT INTO messages (sender_id, receiver_id, subject, message, message_type, is_read, is_group, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, NOW())',
-      [sender_id, recipientId, `Agreement Document - ${agreement.property_title}`, 
-       `${sender[0]?.name || 'A party'} has sent you the agreement document for "${agreement.property_title}". Please review, fill in required fields, and sign the agreement.`,
-       'property']
+      "INSERT INTO messages (sender_id, receiver_id, subject, message, message_type, is_read, is_group, created_at) VALUES (?, ?, ?, ?, ?, FALSE, FALSE, NOW())",
+      [
+        sender_id,
+        recipientId,
+        `Agreement Document - ${agreement.property_title}`,
+        `${sender[0]?.name || "A party"} has sent you the agreement document for "${agreement.property_title}". Please review, fill in required fields, and sign the agreement.`,
+        "property",
+      ],
     );
 
     // Update agreement status to pending if it's still draft
-    if (agreement.status === 'draft') {
-      await db.query("UPDATE agreements SET status = 'pending', updated_at = NOW() WHERE id = ?", [req.params.id]);
+    if (agreement.status === "draft") {
+      await db.query(
+        "UPDATE agreements SET status = 'pending', updated_at = NOW() WHERE id = ?",
+        [req.params.id],
+      );
     }
 
-    res.json({ message: 'Agreement sent successfully', success: true });
+    res.json({ message: "Agreement sent successfully", success: true });
   } catch (error) {
-    console.error('Send agreement error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message, success: false });
+    console.error("Send agreement error:", error);
+    res
+      .status(500)
+      .json({ message: "Server error", error: error.message, success: false });
   }
 });
 
 // Update agreement status
-router.put('/:id/status', async (req, res) => {
+router.put("/:id/status", async (req, res) => {
   try {
     const { status, signed_by_customer_id } = req.body;
 
-    await db.query('UPDATE agreements SET status = ?, updated_at = NOW() WHERE id = ?', [status, req.params.id]);
+    await db.query(
+      "UPDATE agreements SET status = ?, updated_at = NOW() WHERE id = ?",
+      [status, req.params.id],
+    );
 
     if (signed_by_customer_id) {
-      const [agreements] = await db.query('SELECT * FROM agreements WHERE id = ?', [req.params.id]);
+      const [agreements] = await db.query(
+        "SELECT * FROM agreements WHERE id = ?",
+        [req.params.id],
+      );
       if (agreements.length > 0) {
         const agreement = agreements[0];
         const recipient = agreement.owner_id || agreement.broker_id;
         if (recipient) {
           await db.query(
-            'INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, ?)',
-            [recipient, 'Agreement Signed', `Customer signed agreement #${agreement.id} for property ${agreement.property_id}.`, 'success']
+            "INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, ?)",
+            [
+              recipient,
+              "Agreement Signed",
+              `Customer signed agreement #${agreement.id} for property ${agreement.property_id}.`,
+              "success",
+            ],
           );
         }
       }
     }
 
-    res.json({ message: 'Agreement status updated', success: true });
+    res.json({ message: "Agreement status updated", success: true });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 

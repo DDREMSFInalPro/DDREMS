@@ -10,7 +10,7 @@ const db = require('../config/db');
 router.get('/property/:propertyId', async (req, res) => {
   try {
     const [documents] = await db.query(
-      `SELECT pd.*, u.name as uploaded_by_name
+      `SELECT pd.*, pd.document_path as document_url, u.name as uploaded_by_name
        FROM property_documents pd
        LEFT JOIN users u ON pd.uploaded_by = u.id
        WHERE pd.property_id = ?
@@ -28,7 +28,7 @@ router.get('/property/:propertyId', async (req, res) => {
 router.get('/property-doc/:docId', async (req, res) => {
   try {
     const [documents] = await db.query(
-      `SELECT pd.*, u.name as uploaded_by_name
+      `SELECT pd.*, pd.document_path as document_url, u.name as uploaded_by_name
        FROM property_documents pd
        LEFT JOIN users u ON pd.uploaded_by = u.id
        WHERE pd.id = ?`,

@@ -7,6 +7,7 @@
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: #f5f7fa;
+  overflow-x: hidden;
 }
 
 .App {
@@ -34,16 +35,40 @@ body {
 .no-sidebar .main-content {
   margin-left: 0 !important;
   padding: 0;
+  width: 100%;
 }
 
+/* Tablet */
+@media (max-width: 1024px) {
+  .main-content {
+    margin-left: 70px;
+    padding: 20px;
+    width: calc(100% - 70px);
+  }
 
+  .main-content.sidebar-collapsed {
+    margin-left: 70px;
+    width: calc(100% - 70px);
+  }
+}
+
+/* Mobile */
 @media (max-width: 768px) {
   .main-content {
     margin-left: 0;
-    padding: 20px;
+    padding: 16px;
+    width: 100%;
   }
 
   .main-content.sidebar-collapsed {
     margin-left: 0;
+    width: 100%;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+  .main-content {
+    padding: 12px;
   }
 }

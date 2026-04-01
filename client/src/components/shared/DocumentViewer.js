@@ -1,25 +1,27 @@
-import React, { useState } from 'react';
-import './DocumentViewer.css';
-import axios from 'axios';
+import React, { useState } from "react";
+import "./DocumentViewer.css";
+import axios from "axios";
 
-const DocumentViewer = ({ propertyId, userId }) => {
+const DocumentViewer = ({ propertyId, userId, approvedKey }) => {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
-  const [accessKey, setAccessKey] = useState('');
+  const [accessKey, setAccessKey] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [viewedDocument, setViewedDocument] = useState(null);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
-  const [enteredKey, setEnteredKey] = useState('');
+  const [enteredKey, setEnteredKey] = useState("");
 
   const fetchDocuments = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`http://localhost:5000/api/property-documents/property/${propertyId}`);
+      const response = await axios.get(
+        `http://localhost:5000/api/property-documents/property/${propertyId}`,
+      );
       setDocuments(response.data);
     } catch (error) {
-      console.error('Error fetching documents:', error);
+      console.error("Error fetching documents:", error);
     } finally {
       setLoading(false);
     }
@@ -27,47 +29,52 @@ const DocumentViewer = ({ propertyId, userId }) => {
 
   const requestAccess = async () => {
     try {
-      await axios.post('http://localhost:5000/api/document-access/request', {
+      await axios.post("http://localhost:5000/api/document-access/request", {
         property_id: propertyId,
-        user_id: userId
+        user_id: userId,
       });
-      alert('Access request sent! You will receive the access key once approved.');
+      alert(
+        "Access request sent! You will receive the access key once approved.",
+      );
     } catch (error) {
       if (error.response?.data?.message) {
         alert(error.response.data.message);
       } else {
-        alert('Failed to send access request');
+        alert("Failed to send access request");
       }
     }
   };
 
   const verifyAndView = async () => {
     if (!accessKey.trim()) {
-      alert('Please enter an access key');
+      alert("Please enter an access key");
       return;
     }
 
     const normalizedKey = accessKey.trim().toUpperCase();
     setVerifying(true);
     try {
-      const response = await axios.post('http://localhost:5000/api/property-documents/verify-access', {
-        document_id: selectedDoc.id,
-        access_key: normalizedKey
-      });
+      const response = await axios.post(
+        "http://localhost:5000/api/property-documents/verify-access",
+        {
+          document_id: selectedDoc.id,
+          access_key: normalizedKey,
+        },
+      );
 
       // Show document in modal instead of new tab
       setViewedDocument(response.data);
       setEnteredKey(normalizedKey);
       setShowDocumentModal(true);
       setShowKeyModal(false);
-      setAccessKey('');
+      setAccessKey("");
     } catch (error) {
       if (error.response?.status === 401) {
-        alert('Invalid access key. Please check and try again.');
+        alert("Invalid access key. Please check and try again.");
       } else if (error.response?.status === 403) {
-        alert('This document is currently locked by the owner.');
+        alert("This document is currently locked by the owner.");
       } else {
-        alert('Failed to verify access key');
+        alert("Failed to verify access key");
       }
     } finally {
       setVerifying(false);
@@ -84,8 +91,8 @@ const DocumentViewer = ({ propertyId, userId }) => {
   const openKeyModal = (doc) => {
     setSelectedDoc(doc);
     setShowKeyModal(true);
-    setAccessKey('');
-    setEnteredKey('');
+    setAccessKey(approvedKey ? approvedKey.trim().toUpperCase() : "");
+    setEnteredKey("");
   };
 
   if (loading) {
@@ -109,20 +116,22 @@ const DocumentViewer = ({ propertyId, userId }) => {
         </div>
       ) : (
         <div className="documents-list">
-          {documents.map(doc => (
+          {documents.map((doc) => (
             <div key={doc.id} className="document-card">
               <div className="doc-icon">
-                {doc.document_type === 'title_deed' && '📜'}
-                {doc.document_type === 'survey_plan' && '🗺️'}
-                {doc.document_type === 'tax_clearance' && '💳'}
-                {doc.document_type === 'building_permit' && '🏗️'}
-                {doc.document_type === 'ownership_certificate' && '📋'}
-                {doc.document_type === 'other' && '📄'}
+                {doc.document_type === "title_deed" && "📜"}
+                {doc.document_type === "survey_plan" && "🗺️"}
+                {doc.document_type === "tax_clearance" && "💳"}
+                {doc.document_type === "building_permit" && "🏗️"}
+                {doc.document_type === "ownership_certificate" && "📋"}
+                {doc.document_type === "other" && "📄"}
               </div>
               <div className="doc-info">
                 <h4>{doc.document_name}</h4>
-                <p>{doc.document_type.replace('_', ' ').toUpperCase()}</p>
-                <span>Uploaded: {new Date(doc.created_at).toLocaleDateString()}</span>
+                <p>{doc.document_type.replace("_", " ").toUpperCase()}</p>
+                <span>
+                  Uploaded: {new Date(doc.created_at).toLocaleDateString()}
+                </span>
               </div>
               <div className="doc-actions">
                 {doc.is_locked ? (
@@ -146,12 +155,33 @@ const DocumentViewer = ({ propertyId, userId }) => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>🔑 Enter Access Key</h2>
-              <button className="close-btn" onClick={() => setShowKeyModal(false)}>✕</button>
+              <button
+                className="close-btn"
+                onClick={() => setShowKeyModal(false)}
+              >
+                ✕
+              </button>
             </div>
             <div className="modal-body">
-              <p className="key-instruction">
-                Enter the access key provided by the property owner to view this document.
-              </p>
+              {approvedKey ? (
+                <p
+                  className="key-instruction"
+                  style={{
+                    color: "#065f46",
+                    background: "#dcfce7",
+                    padding: "10px",
+                    borderRadius: "6px",
+                  }}
+                >
+                  ✅ Your approved access key has been filled in automatically.
+                  Click "Verify & View" to open the document.
+                </p>
+              ) : (
+                <p className="key-instruction">
+                  Enter the access key provided by the property admin to view
+                  this document.
+                </p>
+              )}
               <div className="key-input-group">
                 <input
                   type="text"
@@ -166,7 +196,7 @@ const DocumentViewer = ({ propertyId, userId }) => {
               <div className="document-preview">
                 <div className="doc-icon-large">📄</div>
                 <h4>{selectedDoc?.document_name}</h4>
-                <p>{selectedDoc?.document_type.replace('_', ' ')}</p>
+                <p>{selectedDoc?.document_type.replace("_", " ")}</p>
               </div>
             </div>
             <div className="modal-actions">
@@ -181,7 +211,7 @@ const DocumentViewer = ({ propertyId, userId }) => {
                 onClick={verifyAndView}
                 disabled={verifying || !accessKey.trim()}
               >
-                {verifying ? '⏳ Verifying...' : '✓ Verify & View'}
+                {verifying ? "⏳ Verifying..." : "✓ Verify & View"}
               </button>
             </div>
           </div>
@@ -189,35 +219,66 @@ const DocumentViewer = ({ propertyId, userId }) => {
       )}
 
       {showDocumentModal && viewedDocument && (
-        <div className="modal-overlay" onClick={() => setShowDocumentModal(false)}>
-          <div className="modal-content extra-large" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onClick={() => setShowDocumentModal(false)}
+        >
+          <div
+            className="modal-content extra-large"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <h2>✅ Document Approved</h2>
-              <button className="close-btn" onClick={() => setShowDocumentModal(false)}>✕</button>
+              <button
+                className="close-btn"
+                onClick={() => setShowDocumentModal(false)}
+              >
+                ✕
+              </button>
             </div>
-            <div className="modal-body" style={{ minHeight: '70vh' }}>
-              <p>Document: <strong>{viewedDocument.document_name}</strong></p>
-              <p>Type: <strong>{viewedDocument.document_type}</strong></p>
-              <p>Access Key used: <strong>{enteredKey || viewedDocument.access_key || 'N/A'}</strong></p>
-              <div style={{ margin: '20px 0' }}>
+            <div className="modal-body" style={{ minHeight: "70vh" }}>
+              <p>
+                Document: <strong>{viewedDocument.document_name}</strong>
+              </p>
+              <p>
+                Type: <strong>{viewedDocument.document_type}</strong>
+              </p>
+              <p>
+                Access Key used:{" "}
+                <strong>
+                  {enteredKey || viewedDocument.access_key || "N/A"}
+                </strong>
+              </p>
+              <div style={{ margin: "20px 0" }}>
                 <iframe
                   title="Document Viewer"
                   src={viewedDocument.document_url}
-                  style={{ width: '100%', height: '60vh', border: '1px solid #cbd5e1', borderRadius: '8px' }}
+                  style={{
+                    width: "100%",
+                    height: "60vh",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "8px",
+                  }}
                 ></iframe>
               </div>
               <button
                 className="btn-secondary"
                 onClick={async () => {
                   try {
-                    const authenticity = await axios.get(`http://localhost:5000/api/property-documents/${selectedDoc.id}/authenticate`);
-                    alert(`🔍 Document authenticity check result: ${authenticity.data.status}.\n${authenticity.data.comments}`);
+                    const authenticity = await axios.get(
+                      `http://localhost:5000/api/property-documents/${selectedDoc.id}/authenticate`,
+                    );
+                    alert(
+                      `🔍 Document authenticity check result: ${authenticity.data.status}.\n${authenticity.data.comments}`,
+                    );
                   } catch (error) {
-                    console.error('Authenticity check failed', error);
-                    alert('Failed to verify document authenticity');
+                    console.error("Authenticity check failed", error);
+                    alert("Failed to verify document authenticity");
                   }
                 }}
-              >Scan Document Originality</button>
+              >
+                Scan Document Originality
+              </button>
             </div>
           </div>
         </div>

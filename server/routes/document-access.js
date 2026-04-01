@@ -19,7 +19,7 @@ router.post('/request', async (req, res) => {
     }
     
     const [result] = await db.query(
-      'INSERT INTO document_access (property_id, user_id, status) VALUES (?, ?, "pending")',
+      "INSERT INTO document_access (property_id, user_id, status) VALUES (?, ?, 'pending')",
       [property_id, user_id]
     );
     

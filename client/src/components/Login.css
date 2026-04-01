@@ -143,3 +143,27 @@
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
+
+@media (max-width: 480px) {
+  .login-container {
+    padding: 12px;
+  }
+
+  .login-card {
+    padding: 24px;
+    border-radius: 12px;
+  }
+
+  .login-header h1 {
+    font-size: 36px;
+  }
+
+  .login-header h2 {
+    font-size: 20px;
+  }
+
+  .login-btn {
+    padding: 12px;
+    font-size: 15px;
+  }
+}
