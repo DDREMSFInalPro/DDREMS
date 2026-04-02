@@ -20,6 +20,27 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 app.get('/', (req, res) => res.json({ status: 'ok', message: 'DDREMS API running' }));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
+// Debug endpoint - check env vars and Supabase connection
+app.get('/debug', async (req, res) => {
+  const supabase = require('./config/db');
+  const result = {
+    env: {
+      SUPABASE_URL: process.env.SUPABASE_URL ? process.env.SUPABASE_URL.substring(0, 30) + '...' : 'NOT SET',
+      SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY ? 'SET (length: ' + process.env.SUPABASE_SERVICE_KEY.length + ')' : 'NOT SET',
+      JWT_SECRET: process.env.JWT_SECRET ? 'SET' : 'NOT SET',
+      PORT: process.env.PORT || 'NOT SET',
+      NODE_VERSION: process.version
+    }
+  };
+  try {
+    const { data, error } = await supabase.from('users').select('count').limit(1);
+    result.supabase = error ? { error: error.message } : { connected: true };
+  } catch (e) {
+    result.supabase = { error: e.message };
+  }
+  res.json(result);
+});
+
 // Add request logging
 app.use((req, res, next) => {
   console.log(`[SERVER] ${req.method} ${req.url}`);
