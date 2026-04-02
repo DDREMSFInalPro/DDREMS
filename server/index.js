@@ -22,19 +22,20 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // Debug endpoint - check env vars and Supabase connection
 app.get('/debug', async (req, res) => {
-  const supabase = require('./config/db');
   const result = {
     env: {
       SUPABASE_URL: process.env.SUPABASE_URL ? process.env.SUPABASE_URL.substring(0, 30) + '...' : 'NOT SET',
       SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY ? 'SET (length: ' + process.env.SUPABASE_SERVICE_KEY.length + ')' : 'NOT SET',
+      DATABASE_URL: process.env.DATABASE_URL ? 'SET (length: ' + process.env.DATABASE_URL.length + ')' : 'NOT SET',
       JWT_SECRET: process.env.JWT_SECRET ? 'SET' : 'NOT SET',
       PORT: process.env.PORT || 'NOT SET',
       NODE_VERSION: process.version
     }
   };
   try {
-    const { data, error } = await supabase.from('users').select('count').limit(1);
-    result.supabase = error ? { error: error.message } : { connected: true };
+    const supabase = require('./config/db');
+    const { data, error } = await supabase.from('users').select('id').limit(1);
+    result.supabase = error ? { error: error.message } : { connected: true, rows: data?.length };
   } catch (e) {
     result.supabase = { error: e.message };
   }
