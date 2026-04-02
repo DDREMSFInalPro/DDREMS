@@ -25,6 +25,7 @@ import KeyRequests from "./components/KeyRequests";
 import AIPricePredictor from "./components/AIPricePredictor";
 import Favorites from "./components/Favorites";
 import AgreementWorkflow from "./components/AgreementWorkflow";
+import BrokerEngagement from "./components/BrokerEngagement";
 import Login from "./components/Login";
 
 function App() {
@@ -181,6 +182,8 @@ function App() {
         return <AIPricePredictor user={user} onLogout={handleLogout} />;
       case "agreement-workflow":
         return <AgreementWorkflow user={user} onLogout={handleLogout} />;
+      case "broker-engagement":
+        return <BrokerEngagement user={user} onLogout={handleLogout} />;
       case "profile":
         if (user.role === "user")
           return <CustomerProfile user={user} onLogout={handleLogout} />;
