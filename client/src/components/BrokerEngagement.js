@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 import "./BrokerEngagement.css";
 
 const API = "http://localhost:5000/api/broker-engagement";
@@ -8,6 +10,7 @@ const STATUS_MAP = {
   pending_broker_acceptance: { emoji: "⏳", label: "Pending Broker Acceptance", color: "#f59e0b" },
   broker_declined: { emoji: "❌", label: "Broker Declined", color: "#ef4444" },
   broker_negotiating: { emoji: "🤝", label: "Broker Negotiating", color: "#3b82f6" },
+  pending_buyer_approval: { emoji: "⏳", label: "Pending Buyer Approval", color: "#f59e0b" },
   owner_counter_offered: { emoji: "🔄", label: "Owner Counter-Offered", color: "#f97316" },
   broker_reviewing_counter: { emoji: "🔍", label: "Broker Reviewing Counter", color: "#8b5cf6" },
   awaiting_buyer_authorization: { emoji: "🔔", label: "Awaiting Your Authorization", color: "#dc2626" },
@@ -36,6 +39,9 @@ const BrokerEngagement = ({ user }) => {
   const [messages, setMessages] = useState([]);
   const [history, setHistory] = useState([]);
   const [signatures, setSignatures] = useState([]);
+  const [contractHTML, setContractHTML] = useState("");
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const contractRef = useRef(null);
 
   const isBuyer = user.role === "user" || user.role === "customer";
   const isBroker = user.role === "broker";
@@ -87,7 +93,7 @@ const BrokerEngagement = ({ user }) => {
 
   const fetchDetails = async (engId) => {
     try {
-      const res = await axios.get(`${API}/${engId}`);
+      const res = await axios.get(`${API}/${engId}?role=${user.role}`);
       setSignatures(res.data.signatures || []);
       setHistory(res.data.history || []);
     } catch (err) { console.error(err); }
@@ -106,6 +112,15 @@ const BrokerEngagement = ({ user }) => {
       await fetchMessages(engagement.id);
       await fetchDetails(engagement.id);
     }
+    if (type === "view_contract") {
+      try {
+        const cRes = await axios.get(`${API}/${engagement.id}/view-contract`);
+        setContractHTML(cRes.data.html || "");
+      } catch (err) {
+        console.error("Error fetching contract:", err);
+        setContractHTML("<p>Contract not found or not yet generated.</p>");
+      }
+    }
     setShowModal(true);
   };
 
@@ -116,6 +131,88 @@ const BrokerEngagement = ({ user }) => {
     setMessages([]);
     setHistory([]);
     setSignatures([]);
+    setContractHTML("");
+  };
+
+  // ── Download PDF using jsPDF + html2canvas ──
+  const handleDownloadPDF = async () => {
+    if (!contractHTML) return;
+    setPdfLoading(true);
+    try {
+      // Create a hidden iframe to render clean HTML for capture
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.left = "-9999px";
+      iframe.style.top = "0";
+      iframe.style.width = "900px";
+      iframe.style.height = "auto";
+      iframe.style.border = "none";
+      document.body.appendChild(iframe);
+
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+      iframeDoc.open();
+      iframeDoc.write(contractHTML);
+      iframeDoc.close();
+
+      // Wait for content to fully render
+      await new Promise((resolve) => {
+        iframe.onload = resolve;
+        setTimeout(resolve, 1500);
+      });
+
+      const body = iframeDoc.body;
+      // Make sure the iframe height fits the full content
+      iframe.style.height = body.scrollHeight + "px";
+      // Small delay for repaint
+      await new Promise((r) => setTimeout(r, 300));
+
+      const canvas = await html2canvas(body, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        width: 900,
+        windowWidth: 900,
+      });
+
+      document.body.removeChild(iframe);
+
+      // Convert canvas to PDF pages (A4)
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth - 20; // 10mm margin each side
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 10; // top margin
+
+      // First page
+      pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
+      heightLeft -= (pageHeight - 20); // subtract usable page height
+
+      // Additional pages if content overflows
+      while (heightLeft > 0) {
+        position = -(imgHeight - heightLeft) + 10;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
+        heightLeft -= (pageHeight - 20);
+      }
+
+      const engId = selectedEngagement?.id || "contract";
+      pdf.save(`DDREMS_Agreement_BA-${String(engId).padStart(5, "0")}.pdf`);
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      alert("❌ Failed to generate PDF. Falling back to browser print.");
+      // Fallback: open in new window for print
+      const win = window.open("", "_blank");
+      win.document.write(contractHTML);
+      win.document.close();
+      win.focus();
+      setTimeout(() => win.print(), 500);
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   const getBadge = (status) => STATUS_MAP[status] || { emoji: "❓", label: status, color: "#6b7280" };
@@ -160,6 +257,13 @@ const BrokerEngagement = ({ user }) => {
           url = `${API}/${id}/broker-negotiate`;
           method = "put";
           data = { broker_id: user.id, offer_price: formData.offer_price, message: formData.message };
+          break;
+
+        case "buyer_review_draft":
+          url = `${API}/${id}/buyer-approve-draft`;
+          method = "put";
+          data = { buyer_id: user.id, decision: formData.decision, reject_reason: formData.reject_reason };
+          if (!data.decision) { alert("Please select Approve or Reject."); setActionLoading(false); return; }
           break;
 
         case "owner_respond":
@@ -299,11 +403,20 @@ const BrokerEngagement = ({ user }) => {
       );
     }
 
-    // Broker: negotiate with owner
+    // Broker: draft offer for buyer approval
     if (isBroker && eng.status === "broker_negotiating") {
       btns.push(
         <button key="negotiate" className="eng-btn eng-btn-primary" onClick={() => openModal("broker_negotiate", eng)}>
-          💬 Send Offer to Owner
+          📝 Draft Offer for Buyer
+        </button>
+      );
+    }
+
+    // Buyer: review broker's draft offer
+    if (isBuyer && eng.status === "pending_buyer_approval") {
+      btns.push(
+        <button key="review_draft" className="eng-btn eng-btn-warning" onClick={() => openModal("buyer_review_draft", eng)}>
+          📋 Review Draft Offer
         </button>
       );
     }
@@ -423,6 +536,15 @@ const BrokerEngagement = ({ user }) => {
       );
     }
 
+    // View Contract (available after generation)
+    if (["pending_signatures", "fully_signed", "payment_submitted", "payment_rejected", "payment_verified", "handover_confirmed", "completed"].includes(eng.status)) {
+      btns.push(
+        <button key="viewcontract" className="eng-btn eng-btn-outline" onClick={() => openModal("view_contract", eng)}>
+          📄 View Agreement
+        </button>
+      );
+    }
+
     // Messages & Details always available
     btns.push(
       <button key="msgs" className="eng-btn eng-btn-outline" onClick={() => openModal("messages", eng)}>
@@ -471,7 +593,7 @@ const BrokerEngagement = ({ user }) => {
               <div className="offer-value">{Number(eng.starting_offer || 0).toLocaleString()} ETB</div>
             </div>
           )}
-          {(!isOwner ? eng.current_offer !== eng.starting_offer : true) && (
+          {(!isOwner || !["pending_broker_acceptance", "broker_declined", "pending_buyer_approval"].includes(eng.status)) && (
             <div className="offer-box current">
               <div className="offer-label">Current Offer</div>
               <div className="offer-value">{Number(eng.current_offer || 0).toLocaleString()} ETB</div>
@@ -604,8 +726,11 @@ const BrokerEngagement = ({ user }) => {
             <p style={{ color: "#64748b", fontSize: 13, marginBottom: 12 }}>
               Current offer: <strong>{Number(selectedEngagement?.current_offer || 0).toLocaleString()} ETB</strong>
             </p>
+            <p style={{ color: "#f59e0b", fontSize: 12, marginBottom: 12, fontStyle: "italic" }}>
+              ⚠️ This offer will be sent to the buyer for approval before going to the owner.
+            </p>
             <div className="eng-form-group">
-              <label>Offer Price to Owner (ETB) *</label>
+              <label>Proposed Offer Price (ETB) *</label>
               <input type="number" value={formData.offer_price || ""} onChange={(e) => setFormData({ ...formData, offer_price: e.target.value })}
                 placeholder={`e.g. ${selectedEngagement?.current_offer || ""}`} />
             </div>
@@ -614,6 +739,44 @@ const BrokerEngagement = ({ user }) => {
               <textarea value={formData.message || ""} onChange={(e) => setFormData({ ...formData, message: e.target.value })} placeholder="Negotiation message..." rows="3" />
             </div>
           </>
+        );
+
+      case "buyer_review_draft":
+        return (
+          <div style={{ padding: 20 }}>
+            <div style={{ textAlign: "center", marginBottom: 16 }}>
+              <p style={{ fontSize: 48, margin: "0 0 12px" }}>📋</p>
+              <h4 style={{ margin: "0 0 8px", color: "#1e293b" }}>Review Broker's Draft Offer</h4>
+              <p style={{ color: "#64748b", fontSize: 14 }}>
+                Your broker has proposed the following offer to send to the property owner:
+              </p>
+            </div>
+            <div style={{ background: "#fffbeb", border: "2px solid #f59e0b", borderRadius: 12, padding: 16, textAlign: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 12, color: "#92400e", fontWeight: 600, marginBottom: 4 }}>PROPOSED OFFER</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: "#b45309" }}>
+                {Number(selectedEngagement?.draft_offer_price || 0).toLocaleString()} ETB
+              </div>
+            </div>
+            <div className="eng-form-group">
+              <label>Your Decision *</label>
+              <select value={formData.decision || ""} onChange={(e) => setFormData({ ...formData, decision: e.target.value })}>
+                <option value="">-- Select --</option>
+                <option value="approve">✅ Approve — Send to Owner</option>
+                <option value="reject">❌ Reject — Ask Broker to Revise</option>
+              </select>
+            </div>
+            {formData.decision === "reject" && (
+              <div className="eng-form-group">
+                <label>Reason for Rejection</label>
+                <textarea 
+                  value={formData.reject_reason || ""} 
+                  onChange={(e) => setFormData({ ...formData, reject_reason: e.target.value })} 
+                  placeholder="e.g. Price too high, I want to offer less..." 
+                  rows="3" 
+                />
+              </div>
+            )}
+          </div>
         );
 
       case "owner_respond":
@@ -793,9 +956,25 @@ const BrokerEngagement = ({ user }) => {
                 placeholder="e.g., TXN-2026-00412 or receipt number" />
             </div>
             <div className="eng-form-group">
-              <label>Receipt Document URL (optional)</label>
-              <input type="text" value={formData.payment_receipt || ""} onChange={(e) => setFormData({ ...formData, payment_receipt: e.target.value })}
-                placeholder="Link to scanned receipt or proof of transfer" />
+              <label>Transaction Proof (Image/PDF File)</label>
+              <input 
+                type="file" 
+                accept="image/*,application/pdf"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setFormData({ ...formData, payment_receipt: reader.result });
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }} 
+                style={{
+                  width: "100%", padding: "10px", border: "1px dashed #cbd5e1", borderRadius: 8, background: "#f8fafc"
+                }}
+              />
+              {formData.payment_receipt && <p style={{fontSize: 12, color: "#059669", marginTop: 4}}>✓ File selected</p>}
             </div>
           </>
         );
@@ -810,6 +989,20 @@ const BrokerEngagement = ({ user }) => {
               <p style={{ margin: "0 0 6px", fontSize: 13, color: "#64748b" }}>Method: <strong style={{ color: "#1e293b" }}>{selectedEngagement?.payment_method || "N/A"}</strong></p>
               <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>Reference: <strong style={{ color: "#1e293b" }}>{selectedEngagement?.payment_reference || "N/A"}</strong></p>
             </div>
+            {selectedEngagement?.payment_receipt && (
+              <div style={{ marginBottom: 16, textAlign: "left" }}>
+                <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: "bold", color: "#1e293b" }}>Uploaded Transaction Proof:</p>
+                {selectedEngagement.payment_receipt.startsWith("data:application/pdf") ? (
+                  <embed src={selectedEngagement.payment_receipt} type="application/pdf" width="100%" height="300px" style={{border: "1px solid #e2e8f0", borderRadius: 8}} />
+                ) : selectedEngagement.payment_receipt.startsWith("data:") || selectedEngagement.payment_receipt.startsWith("http") ? (
+                  <img src={selectedEngagement.payment_receipt} alt="Payment Receipt" style={{maxWidth: "100%", maxHeight: "300px", border: "1px solid #e2e8f0", borderRadius: 8}} />
+                ) : (
+                  <a href={selectedEngagement.payment_receipt} target="_blank" rel="noopener noreferrer" className="eng-btn eng-btn-outline" style={{display: 'inline-block', padding: '6px 12px', fontSize: 12}}>
+                    📄 View Uploaded Document
+                  </a>
+                )}
+              </div>
+            )}
             <p style={{ color: "#94a3b8", fontSize: 13 }}>
               By confirming, you verify that the funds have been safely received into DDREMS accounts.
             </p>
@@ -1004,6 +1197,62 @@ const BrokerEngagement = ({ user }) => {
           </div>
         );
 
+      case "view_contract":
+        return (
+          <div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+              <button
+                className="eng-btn eng-btn-success"
+                style={{ fontSize: 12, padding: "8px 20px", fontWeight: 700, letterSpacing: 0.3 }}
+                onClick={handleDownloadPDF}
+                disabled={pdfLoading}
+              >
+                {pdfLoading ? (
+                  <><span className="spinner" style={{ width: 14, height: 14, marginRight: 6, borderWidth: 2, display: "inline-block", verticalAlign: "middle" }} /> Generating PDF...</>
+                ) : (
+                  "📥 Download PDF"
+                )}
+              </button>
+              <button
+                className="eng-btn eng-btn-primary"
+                style={{ fontSize: 12, padding: "6px 16px" }}
+                onClick={() => {
+                  const printWindow = window.open("", "_blank");
+                  printWindow.document.write(contractHTML);
+                  printWindow.document.close();
+                  printWindow.focus();
+                  setTimeout(() => { printWindow.print(); }, 500);
+                }}
+              >
+                🖨️ Print
+              </button>
+              <button
+                className="eng-btn eng-btn-outline"
+                style={{ fontSize: 12, padding: "6px 16px" }}
+                onClick={() => {
+                  const printWindow = window.open("", "_blank");
+                  printWindow.document.write(contractHTML);
+                  printWindow.document.close();
+                }}
+              >
+                🔎 Open Full View
+              </button>
+            </div>
+            <div
+              ref={contractRef}
+              style={{
+                border: "1px solid #e2e8f0",
+                borderRadius: 8,
+                overflow: "auto",
+                maxHeight: 500,
+                background: "#fff",
+                boxShadow: "inset 0 2px 4px rgba(0,0,0,0.06)"
+              }}
+              dangerouslySetInnerHTML={{ __html: contractHTML }}
+            />
+          </div>
+        );
+
       default:
         return <p>Unknown action</p>;
     }
@@ -1014,7 +1263,8 @@ const BrokerEngagement = ({ user }) => {
       case "hire": return "🤝 Hire a Broker";
       case "broker_accept": return "🤝 Accept Representation";
       case "broker_reject": return "❌ Reject Representation";
-      case "broker_negotiate": return "💬 Send Offer to Owner";
+      case "broker_negotiate": return "📝 Draft Offer for Buyer Approval";
+      case "buyer_review_draft": return "📋 Review Draft Offer";
       case "owner_respond": return "📋 Respond to Broker's Offer";
       case "broker_advise": return "📋 Advise the Buyer";
       case "buyer_authorize": return "🔔 Authorize Action";
@@ -1029,11 +1279,12 @@ const BrokerEngagement = ({ user }) => {
       case "send_message": return "💬 Send Message";
       case "messages": return "💬 Engagement Thread";
       case "details": return "👁️ Engagement Details";
+      case "view_contract": return "📄 Agreement Document";
       default: return "Action";
     }
   };
 
-  const showSubmitButton = !["messages", "details"].includes(modalType);
+  const showSubmitButton = !["messages", "details", "view_contract"].includes(modalType);
 
   // ── Main Render ──
   return (

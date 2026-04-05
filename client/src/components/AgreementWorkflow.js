@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 import "./AgreementWorkflow.css";
 import PageHeader from "./PageHeader";
 
@@ -115,6 +117,56 @@ const AgreementWorkflow = ({ user, onLogout }) => {
   const [formData, setFormData] = useState({});
   const [actionLoading, setActionLoading] = useState(false);
   const [activeProperties, setActiveProperties] = useState([]);
+  const [viewedAgreements, setViewedAgreements] = useState({});
+  const [contractHTML, setContractHTML] = useState(null);
+  const [contractError, setContractError] = useState(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const contractRef = useRef(null);
+
+  const handleViewContract = async (id) => {
+    setContractHTML(null);
+    setContractError(null);
+    try {
+      const res = await axios.get(`${API}/${id}/view-agreement`);
+      if (res.data.success) {
+        setContractHTML(res.data.document.document_content);
+        setViewedAgreements((prev) => ({ ...prev, [id]: true }));
+      } else {
+        setContractError(res.data.message || "Failed to load document");
+      }
+    } catch (err) {
+      console.error("Error viewing contract:", err);
+      setContractError(err.response?.data?.message || err.message || "Failed to load the contract document.");
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!contractRef.current) return;
+    setDownloadingPdf(true);
+    try {
+      const canvas = await html2canvas(contractRef.current, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      let heightLeft = pdfHeight;
+      let position = 0;
+      pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pdf.internal.pageSize.getHeight();
+      while (heightLeft > 0) {
+        position = heightLeft - pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, pdfHeight);
+        heightLeft -= pdf.internal.pageSize.getHeight();
+      }
+      pdf.save(`Agreement_AGR_${selectedAgreement?.id}.pdf`);
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      alert("Could not generate PDF. Please try again.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   useEffect(() => {
     fetchAgreements();
@@ -526,6 +578,17 @@ const AgreementWorkflow = ({ user, onLogout }) => {
             onClick={() => openModal(agr, "confirm_handover")}
           >
             🔑 Confirm Handover
+          </button>
+        )}
+        {["agreement_generated", "buyer_signed", "fully_signed", "payment_submitted", "payment_verified", "handover_confirmed"].includes(agr.status) && (
+          <button
+            className="btn-outline"
+            onClick={() => {
+              handleViewContract(agr.id);
+              openModal(agr, "view_agreement");
+            }}
+          >
+            📄 View Agreement
           </button>
         )}
       </>
@@ -1631,6 +1694,11 @@ const AgreementWorkflow = ({ user, onLogout }) => {
                 ETB
               </p>
             </div>
+            {!viewedAgreements[selectedAgreement?.id] && (
+              <div className="warning-text" style={{color: '#dc2626'}}>
+                ⚠️ You must view the PDF agreement before you can sign.
+              </div>
+            )}
             <div className="warning-text">⚠️ This action cannot be undone.</div>
           </div>
         </div>
@@ -1669,6 +1737,11 @@ const AgreementWorkflow = ({ user, onLogout }) => {
             <div className="warning-text">
               ⚠️ After both signatures, the contract is locked.
             </div>
+            {!viewedAgreements[selectedAgreement?.id] && (
+              <div className="warning-text" style={{color: '#dc2626', marginTop: 8}}>
+                ⚠️ You must view the PDF agreement before you can sign.
+              </div>
+            )}
           </div>
         </div>
       );
@@ -1725,14 +1798,20 @@ const AgreementWorkflow = ({ user, onLogout }) => {
             />
           </div>
           <div className="form-group">
-            <label>Receipt Document (optional)</label>
+            <label>Receipt Document / Proof of Payment (Image or PDF)</label>
             <input
-              type="text"
-              value={formData.receipt_document || ""}
-              onChange={(e) =>
-                setFormData({ ...formData, receipt_document: e.target.value })
-              }
-              placeholder="Upload or paste receipt URL"
+              type="file"
+              accept="image/*, application/pdf"
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    setFormData({ ...formData, receipt_document: reader.result });
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
             />
           </div>
         </div>
@@ -1763,6 +1842,20 @@ const AgreementWorkflow = ({ user, onLogout }) => {
                 ETB
               </p>
             </div>
+            {selectedAgreement?.receipt_document && (
+              <div className="form-group" style={{ marginTop: '16px' }}>
+                <label>Uploaded Payment Proof</label>
+                {selectedAgreement.receipt_document.startsWith('data:image') ? (
+                  <img src={selectedAgreement.receipt_document} alt="Payment Proof" style={{ maxWidth: '100%', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                ) : selectedAgreement.receipt_document.startsWith('data:application/pdf') ? (
+                  <iframe src={selectedAgreement.receipt_document} style={{ width: '100%', height: '400px', border: '1px solid #e2e8f0', borderRadius: '8px' }} title="Payment Proof PDF" />
+                ) : (
+                  <a href={selectedAgreement.receipt_document} target="_blank" rel="noopener noreferrer" className="btn-outline">
+                    📎 View Document
+                  </a>
+                )}
+              </div>
+            )}
           </div>
           <div className="form-group">
             <label>Verification Notes</label>
@@ -1859,6 +1952,46 @@ const AgreementWorkflow = ({ user, onLogout }) => {
       );
     }
 
+    if (modalType === "view_agreement") {
+      return (
+        <div className="modal-form" style={{ maxWidth: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+            <p className="form-desc" style={{ margin: 0 }}>Review the details of the agreement below.</p>
+            <button 
+              className="btn-outline" 
+              onClick={handleDownloadPDF}
+              disabled={downloadingPdf || !contractHTML}
+              style={{ padding: '6px 12px', fontSize: 13 }}
+            >
+              {downloadingPdf ? "⏳ Generating PDF..." : "📥 Download PDF"}
+            </button>
+          </div>
+          
+          <div 
+            style={{ 
+              background: '#f1f5f9', padding: '16px', borderRadius: 8,
+              maxHeight: '600px', overflowY: 'auto', border: '1px solid #cbd5e1'
+            }}
+          >
+            {contractHTML ? (
+              <div 
+                ref={contractRef}
+                style={{ 
+                  background: '#fff', padding: '30px', margin: '0 auto',
+                  maxWidth: '800px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                }}
+                dangerouslySetInnerHTML={{ __html: contractHTML }}
+              />
+            ) : contractError ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#ef4444' }}>❌ {contractError}</div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '40px' }}>⏳ Loading document...</div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -1878,6 +2011,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
       verify_payment: "✅ Verify Payment",
       confirm_handover: "🔑 Confirm Handover",
       release_funds: "💸 Release Funds",
+      view_agreement: "📄 View Agreement Document",
     };
     return titles[modalType] || "Agreement";
   };
@@ -1935,11 +2069,14 @@ const AgreementWorkflow = ({ user, onLogout }) => {
               <button className="btn-secondary" onClick={closeModal}>
                 Cancel
               </button>
-              {modalType !== "details" && (
+              {modalType !== "details" && modalType !== "view_agreement" && (
                 <button
                   className="btn-primary"
                   onClick={submitAction}
-                  disabled={actionLoading}
+                  disabled={
+                    actionLoading || 
+                    ((modalType === "buyer_sign" || modalType === "owner_sign") && !viewedAgreements[selectedAgreement?.id])
+                  }
                 >
                   {actionLoading ? "⏳ Processing..." : "✅ Confirm"}
                 </button>

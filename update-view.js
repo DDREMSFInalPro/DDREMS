@@ -2,10 +2,7 @@ const db = require('./server/config/db');
 
 async function run() {
   try {
-    // Drop view first
-    await db.query('DROP VIEW IF EXISTS v_broker_engagements');
-
-    // Recreate with signed_roles
+    await db.query(`DROP VIEW IF EXISTS v_broker_engagements`);
     await db.query(`
       CREATE OR REPLACE VIEW v_broker_engagements AS
       SELECT
@@ -21,9 +18,9 @@ async function run() {
         owner.name AS owner_name,
         owner.email AS owner_email,
         (
-          SELECT string_agg(signer_role, ',')
-          FROM broker_engagement_signatures
-          WHERE engagement_id = be.id
+          SELECT COALESCE(json_agg(bes.signer_role), '[]'::json)
+          FROM broker_engagement_signatures bes
+          WHERE bes.engagement_id = be.id
         ) AS signed_roles
       FROM broker_engagements be
       JOIN properties p ON be.property_id = p.id
@@ -31,7 +28,7 @@ async function run() {
       JOIN users broker ON be.broker_id = broker.id
       JOIN users owner ON be.owner_id = owner.id
     `);
-    console.log('View updated successfully!');
+    console.log('v_broker_engagements view updated successfully!');
   } catch (err) {
     console.error('Error:', err.message);
   } finally {

@@ -24,6 +24,16 @@ async function systemMessage(engagementId, message, metadata) {
   );
 }
 
+// HELPER: Add a private system message (hidden from opposing party)
+async function systemMessagePrivate(engagementId, message, metadata) {
+  await db.query(
+    `INSERT INTO broker_engagement_messages
+       (engagement_id, sender_id, sender_role, message_type, message, metadata)
+     VALUES (?, NULL, 'system', 'advice', ?, ?)`,
+    [engagementId, message, metadata ? JSON.stringify(metadata) : null]
+  );
+}
+
 // HELPER: Notify user
 async function notifyUser(userId, title, message, type) {
   await db.query(
@@ -101,15 +111,15 @@ router.post("/hire", async (req, res) => {
     await logHistory(engId, "engagement_created", buyer_id, "buyer", null, "pending_broker_acceptance",
       "Buyer hired broker for property negotiation", { starting_offer: offer });
 
-    // System message
-    await systemMessage(engId, `Buyer has requested broker representation with a starting offer of ${Number(offer).toLocaleString()} ETB.`);
+    // System message (private to buyer/broker)
+    await systemMessagePrivate(engId, `Buyer has requested broker representation with a starting offer of ${Number(offer).toLocaleString()} ETB.`);
 
-    // If buyer sent a message, record it
+    // If buyer sent a message, record it (as advice so owner doesn't see it)
     if (buyer_message) {
       await db.query(
         `INSERT INTO broker_engagement_messages
            (engagement_id, sender_id, sender_role, message_type, message)
-         VALUES (?, ?, 'buyer', 'general', ?)`,
+         VALUES (?, ?, 'buyer', 'advice', ?)`,
         [engId, buyer_id, buyer_message]
       );
     }
@@ -167,7 +177,7 @@ router.put("/:id/broker-accept", async (req, res) => {
       );
       await logHistory(id, "broker_declined", broker_id, "broker", "pending_broker_acceptance", "broker_declined",
         decline_reason || "Broker declined representation");
-      await systemMessage(id, `Broker has declined the engagement.${decline_reason ? " Reason: " + decline_reason : ""}`);
+      await systemMessagePrivate(id, `Broker has declined the engagement.${decline_reason ? " Reason: " + decline_reason : ""}`);
       await notifyUser(eng.buyer_id, "❌ Broker Declined", `Your broker has declined representation.${decline_reason ? " Reason: " + decline_reason : ""}`, "error");
 
       res.json({ success: true, message: "Engagement declined.", status: "broker_declined" });
@@ -180,7 +190,7 @@ router.put("/:id/broker-accept", async (req, res) => {
 
 // ============================================================================
 // PUT /api/broker-engagement/:id/broker-negotiate
-// Broker sends an offer to the owner
+// Broker drafts an offer → requires Buyer approval before sending to Owner
 // ============================================================================
 router.put("/:id/broker-negotiate", async (req, res) => {
   try {
@@ -200,28 +210,112 @@ router.put("/:id/broker-negotiate", async (req, res) => {
 
     const price = offer_price || eng.current_offer;
 
+    // Save draft offer price and set pending_buyer_approval
     await db.query(
-      `UPDATE broker_engagements SET current_offer = ?, updated_at = NOW() WHERE id = ?`,
+      `UPDATE broker_engagements SET draft_offer_price = ?, status = 'pending_buyer_approval', updated_at = NOW() WHERE id = ?`,
       [price, id]
     );
 
-    // Record negotiation message
+    // Record draft message (private — advice type so owner can't see it)
     await db.query(
       `INSERT INTO broker_engagement_messages
          (engagement_id, sender_id, sender_role, message_type, message, metadata)
-       VALUES (?, ?, 'broker', 'negotiation', ?, ?)`,
-      [id, broker_id, message || `Offer of ${Number(price).toLocaleString()} ETB`, JSON.stringify({ offer_price: price })]
+       VALUES (?, ?, 'broker', 'advice', ?, ?)`,
+      [id, broker_id, message || `Broker drafted an offer of ${Number(price).toLocaleString()} ETB for buyer approval`, JSON.stringify({ draft_offer_price: price })]
     );
 
-    await logHistory(id, "broker_sent_offer", broker_id, "broker", eng.status, eng.status,
-      `Broker sent offer of ${Number(price).toLocaleString()} ETB to owner`, { offer_price: price });
+    await logHistory(id, "broker_drafted_offer", broker_id, "broker", "broker_negotiating", "pending_buyer_approval",
+      `Broker drafted offer of ${Number(price).toLocaleString()} ETB — awaiting buyer approval`, { draft_offer_price: price });
 
-    await notifyUser(eng.owner_id, "📋 New Offer from Broker",
-      `A broker has sent an offer of ${Number(price).toLocaleString()} ETB for your property. Please review and respond.`, "info");
+    await notifyUser(eng.buyer_id, "📋 Review Broker's Draft Offer",
+      `Your broker has drafted an offer of ${Number(price).toLocaleString()} ETB. Please review and approve or reject before it is sent to the owner.`, "warning");
 
-    res.json({ success: true, message: "Offer sent to owner", current_offer: price });
+    res.json({ success: true, message: "Draft offer sent to buyer for approval", status: "pending_buyer_approval" });
   } catch (error) {
-    console.error("Error sending broker offer:", error);
+    console.error("Error drafting broker offer:", error);
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
+  }
+});
+
+// ============================================================================
+// PUT /api/broker-engagement/:id/buyer-approve-draft
+// Buyer approves or rejects the broker's draft offer
+// ============================================================================
+router.put("/:id/buyer-approve-draft", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { buyer_id, decision, reject_reason } = req.body;
+
+    const [engagement] = await db.query("SELECT * FROM broker_engagements WHERE id = ?", [id]);
+    if (engagement.length === 0) return res.status(404).json({ success: false, message: "Engagement not found" });
+
+    const eng = engagement[0];
+    if (eng.status !== "pending_buyer_approval") {
+      return res.status(400).json({ success: false, message: "No draft pending approval. Current status: " + eng.status });
+    }
+    if (eng.buyer_id !== buyer_id) {
+      return res.status(403).json({ success: false, message: "You are not the buyer" });
+    }
+
+    const draftPrice = eng.draft_offer_price;
+
+    if (decision === "approve") {
+      // Update current_offer and send to owner
+      await db.query(
+        `UPDATE broker_engagements SET current_offer = ?, draft_offer_price = NULL, status = 'broker_negotiating', updated_at = NOW() WHERE id = ?`,
+        [draftPrice, id]
+      );
+
+      // Record the official negotiation message (visible to owner)
+      await db.query(
+        `INSERT INTO broker_engagement_messages
+           (engagement_id, sender_id, sender_role, message_type, message, metadata)
+         VALUES (?, ?, 'broker', 'negotiation', ?, ?)`,
+        [id, eng.broker_id, `Offer of ${Number(draftPrice).toLocaleString()} ETB`, JSON.stringify({ offer_price: draftPrice })]
+      );
+
+      await logHistory(id, "buyer_approved_draft", buyer_id, "buyer", "pending_buyer_approval", "broker_negotiating",
+        `Buyer approved draft offer of ${Number(draftPrice).toLocaleString()} ETB — offer sent to owner`, { offer_price: draftPrice });
+
+      await systemMessage(id, `Buyer approved the draft offer. Offer of ${Number(draftPrice).toLocaleString()} ETB has been sent to the owner.`);
+
+      // Notify owner
+      await notifyUser(eng.owner_id, "📋 New Offer from Broker",
+        `A broker has sent an offer of ${Number(draftPrice).toLocaleString()} ETB for your property. Please review and respond.`, "info");
+      // Notify broker
+      await notifyUser(eng.broker_id, "✅ Buyer Approved Your Offer",
+        `The buyer approved your draft offer of ${Number(draftPrice).toLocaleString()} ETB. It has been sent to the owner.`, "success");
+
+      res.json({ success: true, message: "Offer approved and sent to owner", status: "broker_negotiating" });
+    } else {
+      // Buyer rejected — revert to broker_negotiating
+      await db.query(
+        `UPDATE broker_engagements SET draft_offer_price = NULL, status = 'broker_negotiating', updated_at = NOW() WHERE id = ?`,
+        [id]
+      );
+
+      const reason = reject_reason || "No reason provided";
+
+      await db.query(
+        `INSERT INTO broker_engagement_messages
+           (engagement_id, sender_id, sender_role, message_type, message, metadata)
+         VALUES (?, ?, 'buyer', 'authorization', ?, ?)`,
+        [id, buyer_id, `Buyer rejected draft offer of ${Number(draftPrice).toLocaleString()} ETB. Reason: ${reason}`, JSON.stringify({ rejected_price: draftPrice, reason })]
+      );
+
+      await logHistory(id, "buyer_rejected_draft", buyer_id, "buyer", "pending_buyer_approval", "broker_negotiating",
+        `Buyer rejected draft offer of ${Number(draftPrice).toLocaleString()} ETB. Reason: ${reason}`, { rejected_price: draftPrice, reason });
+
+      await systemMessagePrivate(id, `Buyer rejected the draft offer of ${Number(draftPrice).toLocaleString()} ETB. Reason: ${reason}. Broker should draft a new offer.`);
+
+      // Notify broker
+      await notifyUser(eng.broker_id, "❌ Buyer Rejected Draft Offer",
+        `The buyer rejected your draft of ${Number(draftPrice).toLocaleString()} ETB. Reason: ${reason}. Please draft a revised offer.`, "warning");
+
+      res.json({ success: true, message: "Draft rejected. Broker can draft a new offer.", status: "broker_negotiating" });
+    }
+  } catch (error) {
+    console.error("Error processing buyer draft approval:", error);
     res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 });
@@ -570,14 +664,14 @@ router.put("/:id/broker-finalize", async (req, res) => {
 
 // ============================================================================
 // POST /api/broker-engagement/:id/generate-contract
-// Admin generates PDF contract with agreed price
+// Admin generates professional HTML contract with agreed price
 // ============================================================================
 router.post("/:id/generate-contract", async (req, res) => {
   try {
     const { id } = req.params;
     const { admin_id } = req.body;
 
-    const [engagement] = await db.query("SELECT * FROM broker_engagements WHERE id = ?", [id]);
+    const [engagement] = await db.query("SELECT * FROM v_broker_engagements WHERE id = ?", [id]);
     if (engagement.length === 0) return res.status(404).json({ success: false, message: "Engagement not found" });
 
     const eng = engagement[0];
@@ -585,27 +679,189 @@ router.post("/:id/generate-contract", async (req, res) => {
       return res.status(400).json({ success: false, message: "Deal must be finalized before generating contract. Status: " + eng.status });
     }
 
-    // Create agreement document
-    const documentContent = JSON.stringify({
-      engagement_id: eng.id,
-      type: "broker_assisted_purchase",
-      buyer_id: eng.buyer_id,
-      broker_id: eng.broker_id,
-      owner_id: eng.owner_id,
-      property_id: eng.property_id,
-      agreed_price: eng.agreed_price,
-      starting_offer: eng.starting_offer,
-      commission_percentage: eng.commission_percentage,
-      generated_date: new Date().toISOString(),
-      generated_by: admin_id
-    });
+    const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    const agreedPrice = Number(eng.agreed_price || 0);
+    const commPct = Number(eng.commission_percentage || 5);
+    const commissionAmount = (agreedPrice * commPct / 100).toFixed(2);
+    const systemFee = (agreedPrice * 0.02).toFixed(2);
+    const ownerNet = (agreedPrice - Number(commissionAmount) - Number(systemFee)).toFixed(2);
 
+    const contractHTML = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Broker-Assisted Purchase Agreement - DDREMS #${eng.id}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Georgia', 'Times New Roman', serif; color: #1a1a2e; background: #fff; padding: 50px; max-width: 900px; margin: 0 auto; line-height: 1.7; }
+    .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 100px; color: rgba(59, 130, 246, 0.04); font-weight: 900; letter-spacing: 10px; pointer-events: none; z-index: 0; }
+    .header { text-align: center; border-bottom: 4px double #16213e; padding-bottom: 24px; margin-bottom: 30px; position: relative; z-index: 1; }
+    .header .logo { font-size: 32px; font-weight: 900; color: #16213e; letter-spacing: 4px; margin-bottom: 4px; }
+    .header .subtitle { font-size: 18px; color: #0f3460; font-weight: 500; margin-bottom: 6px; }
+    .header .tagline { font-size: 12px; color: #6b7280; font-style: italic; }
+    .meta-row { display: flex; justify-content: space-between; font-size: 12px; color: #6b7280; margin-bottom: 24px; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; }
+    .section { margin-bottom: 28px; position: relative; z-index: 1; }
+    .section-title { font-size: 15px; font-weight: 700; color: #16213e; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 2px solid #3b82f6; padding-bottom: 6px; margin-bottom: 14px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .info-item { padding: 10px 14px; background: #f8fafc; border-radius: 6px; border-left: 3px solid #3b82f6; }
+    .info-item label { display: block; font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 2px; }
+    .info-item span { font-size: 14px; font-weight: 600; color: #1e293b; }
+    .party-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    .party-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; background: #fafbfc; }
+    .party-box h4 { color: #0f3460; margin-bottom: 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .party-box p { font-size: 12px; color: #374151; line-height: 1.6; }
+    .price-highlight { text-align: center; background: linear-gradient(135deg, #1e3a5f, #16213e); color: #fff; border-radius: 10px; padding: 20px; margin: 16px 0; }
+    .price-highlight .label { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.8; margin-bottom: 4px; }
+    .price-highlight .amount { font-size: 36px; font-weight: 900; letter-spacing: 1px; }
+    .breakdown-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .breakdown-table th, .breakdown-table td { padding: 10px 14px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+    .breakdown-table th { background: #f1f5f9; color: #374151; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+    .breakdown-table td.amount { text-align: right; font-weight: 600; }
+    .breakdown-table tr.total td { border-top: 2px solid #16213e; font-weight: 800; font-size: 14px; }
+    .terms-text { padding: 18px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 13px; line-height: 1.9; }
+    .terms-text ol { padding-left: 20px; }
+    .terms-text li { margin-bottom: 8px; }
+    .signature-section { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-top: 32px; padding-top: 24px; border-top: 3px double #e2e8f0; }
+    .signature-box { text-align: center; }
+    .signature-box h4 { font-size: 12px; color: #16213e; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+    .signature-line { border: 2px solid #d1d5db; border-radius: 8px; height: 80px; margin-bottom: 6px; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-style: italic; font-size: 12px; background: #fefefe; overflow: hidden; }
+    .signature-line img { max-height: 72px; max-width: 90%; }
+    .signature-name { font-size: 12px; color: #374151; border-top: 1px solid #374151; padding-top: 4px; margin-top: 4px; }
+    .signature-date { font-size: 10px; color: #6b7280; margin-top: 2px; }
+    .footer { text-align: center; margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #9ca3af; }
+    .footer p { margin-bottom: 2px; }
+    .stamp { display: inline-block; border: 2px solid #3b82f6; border-radius: 8px; padding: 4px 12px; font-size: 10px; color: #3b82f6; font-weight: 700; letter-spacing: 1px; margin-top: 8px; }
+    @media print { body { padding: 20px; } .watermark { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="watermark">DDREMS</div>
+
+  <div class="header">
+    <div class="logo">DDREMS</div>
+    <div class="subtitle">Property Purchase Agreement</div>
+    <div class="tagline">Broker-Assisted Transaction • Dire Dawa Real Estate Management System</div>
+  </div>
+
+  <div class="meta-row">
+    <span>Agreement Reference: <strong>BA-${String(eng.id).padStart(5, '0')}</strong></span>
+    <span>Date: <strong>${today}</strong></span>
+    <span>Status: <strong>Pending Signatures</strong></span>
+  </div>
+
+  <div class="section">
+    <h3 class="section-title">🏠 Property Information</h3>
+    <div class="info-grid">
+      <div class="info-item"><label>Property Title</label><span>${eng.property_title || "N/A"}</span></div>
+      <div class="info-item"><label>Location</label><span>${eng.property_location || "N/A"}</span></div>
+      <div class="info-item"><label>Property Type</label><span>${(eng.property_type || "N/A").charAt(0).toUpperCase() + (eng.property_type || "").slice(1)}</span></div>
+      <div class="info-item"><label>Listed Price</label><span>${Number(eng.property_price || 0).toLocaleString()} ETB</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3 class="section-title">👥 Parties to this Agreement</h3>
+    <div class="party-grid">
+      <div class="party-box">
+        <h4>🙋 Buyer</h4>
+        <p><strong>${eng.buyer_name || "N/A"}</strong></p>
+        <p>${eng.buyer_email || "N/A"}</p>
+      </div>
+      <div class="party-box">
+        <h4>🤵 Broker (Representative)</h4>
+        <p><strong>${eng.broker_name || "N/A"}</strong></p>
+        <p>${eng.broker_email || "N/A"}</p>
+      </div>
+      <div class="party-box">
+        <h4>🏢 Property Owner</h4>
+        <p><strong>${eng.owner_name || "N/A"}</strong></p>
+        <p>${eng.owner_email || "N/A"}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3 class="section-title">💰 Agreed Transaction Price</h3>
+    <div class="price-highlight">
+      <div class="label">Final Agreed Price</div>
+      <div class="amount">${agreedPrice.toLocaleString()} ETB</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3 class="section-title">📊 Financial Breakdown</h3>
+    <table class="breakdown-table">
+      <thead><tr><th>Description</th><th style="text-align:right">Amount</th></tr></thead>
+      <tbody>
+        <tr><td>Agreed Purchase Price</td><td class="amount">${agreedPrice.toLocaleString()} ETB</td></tr>
+        <tr><td>Broker Commission (${commPct}%)</td><td class="amount">- ${Number(commissionAmount).toLocaleString()} ETB</td></tr>
+        <tr><td>System Service Fee (2%)</td><td class="amount">- ${Number(systemFee).toLocaleString()} ETB</td></tr>
+        <tr class="total"><td>Net Amount to Owner</td><td class="amount">${Number(ownerNet).toLocaleString()} ETB</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h3 class="section-title">📝 Terms and Conditions</h3>
+    <div class="terms-text">
+      <ol>
+        <li><strong>Sale Agreement:</strong> The Buyer agrees to purchase, and the Owner agrees to sell, the above-described property at the agreed price of <strong>${agreedPrice.toLocaleString()} ETB</strong>.</li>
+        <li><strong>Broker Representation:</strong> The Broker has acted as the authorized representative of the Buyer in negotiating this transaction. The Broker is entitled to a commission of <strong>${commPct}%</strong> of the agreed price.</li>
+        <li><strong>Payment:</strong> The Buyer shall submit the full agreed amount via the DDREMS platform. Payment must be verified by a system administrator before the ownership transfer can proceed.</li>
+        <li><strong>Property Handover:</strong> Upon payment verification, the Owner shall hand over the property to the Buyer within <strong>14 business days</strong> unless otherwise agreed upon by both parties.</li>
+        <li><strong>Dispute Resolution:</strong> Any disputes arising from this agreement shall be resolved through mediation facilitated by the DDREMS platform administration, and if unresolved, through the appropriate legal channels in Dire Dawa, Ethiopia.</li>
+        <li><strong>Governing Law:</strong> This agreement is governed by the laws of the Federal Democratic Republic of Ethiopia.</li>
+        <li><strong>Digital Signatures:</strong> All parties acknowledge that digital signatures applied through the DDREMS platform carry the same legal weight as physical signatures under applicable electronic transaction laws.</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3 class="section-title">✍️ Digital Signatures</h3>
+    <div class="signature-section">
+      <div class="signature-box">
+        <h4>Buyer</h4>
+        <div class="signature-line" id="sig-buyer">Awaiting Signature</div>
+        <div class="signature-name">${eng.buyer_name || "________________"}</div>
+        <div class="signature-date" id="sig-buyer-date">Date: ___________</div>
+      </div>
+      <div class="signature-box">
+        <h4>Broker</h4>
+        <div class="signature-line" id="sig-broker">Awaiting Signature</div>
+        <div class="signature-name">${eng.broker_name || "________________"}</div>
+        <div class="signature-date" id="sig-broker-date">Date: ___________</div>
+      </div>
+      <div class="signature-box">
+        <h4>Owner</h4>
+        <div class="signature-line" id="sig-owner">Awaiting Signature</div>
+        <div class="signature-name">${eng.owner_name || "________________"}</div>
+        <div class="signature-date" id="sig-owner-date">Date: ___________</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>This document was generated by the Dire Dawa Real Estate Management System (DDREMS)</p>
+    <p>Agreement Reference: BA-${String(eng.id).padStart(5, '0')} | Generated: ${today}</p>
+    <div class="stamp">OFFICIAL DDREMS DOCUMENT</div>
+  </div>
+</body>
+</html>`;
+
+    // Store in agreement_documents
     await db.query(
       `INSERT INTO agreement_documents
          (agreement_request_id, version, document_type, document_content, generated_by_id)
        VALUES (NULL, 1, 'broker_assisted', ?, ?)`,
-      [documentContent, admin_id]
+      [contractHTML, admin_id]
     );
+
+    // Link the document to the engagement
+    const [docResult] = await db.query(
+      `SELECT id FROM agreement_documents WHERE document_type = 'broker_assisted' AND document_content LIKE ? ORDER BY id DESC LIMIT 1`,
+      [`%BA-${String(eng.id).padStart(5, '0')}%`]
+    );
+    const docId = docResult.length > 0 ? docResult[0].id : null;
 
     await db.query(
       `UPDATE broker_engagements SET
@@ -615,19 +871,72 @@ router.post("/:id/generate-contract", async (req, res) => {
     );
 
     await logHistory(id, "contract_generated", admin_id, "admin", "agreement_generated", "pending_signatures",
-      "Admin generated the PDF contract");
-    await systemMessage(id, "Contract has been generated. All three parties must now sign: Buyer → Broker → Owner.");
+      "Admin generated the agreement contract");
+    await systemMessage(id, "📄 Contract has been generated. All three parties must now sign: Buyer → Broker → Owner.");
 
     await notifyUser(eng.buyer_id, "📄 Contract Ready to Sign",
-      "The contract has been generated. Please review and sign it.", "info");
+      "The agreement contract has been generated. Please review and sign it.", "info");
     await notifyUser(eng.broker_id, "📄 Contract Generated",
-      "The contract has been generated. Buyer will sign first, then you.", "info");
+      "The agreement contract has been generated. Buyer will sign first, then you.", "info");
     await notifyUser(eng.owner_id, "📄 Contract Generated",
-      "The contract has been generated. It will be sent to you for signing after the buyer and broker have signed.", "info");
+      "The agreement contract has been generated. It will be sent to you for signing after the buyer and broker have signed.", "info");
 
-    res.json({ success: true, message: "Contract generated. Awaiting signatures.", status: "pending_signatures" });
+    res.json({ success: true, message: "Contract generated. Awaiting signatures.", status: "pending_signatures", document_id: docId });
   } catch (error) {
     console.error("Error generating contract:", error);
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
+  }
+});
+
+// ============================================================================
+// GET /api/broker-engagement/:id/view-contract
+// Get the generated HTML contract for preview/download
+// ============================================================================
+router.get("/:id/view-contract", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the contract document for this engagement
+    const [docs] = await db.query(
+      `SELECT * FROM agreement_documents 
+       WHERE document_type = 'broker_assisted' 
+       AND document_content LIKE ?
+       ORDER BY id DESC LIMIT 1`,
+      [`%BA-${String(id).padStart(5, '0')}%`]
+    );
+
+    if (docs.length === 0) {
+      return res.status(404).json({ success: false, message: "No contract found for this engagement" });
+    }
+
+    // Also get signatures to inject into the HTML
+    const [signatures] = await db.query(
+      `SELECT bes.*, u.name AS signer_name
+       FROM broker_engagement_signatures bes
+       JOIN users u ON bes.signer_id = u.id
+       WHERE bes.engagement_id = ? ORDER BY bes.signed_at ASC`,
+      [id]
+    );
+
+    let html = docs[0].document_content;
+
+    // Inject signatures into the HTML
+    for (const sig of signatures) {
+      const role = sig.signer_role;
+      const sigDate = new Date(sig.signed_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+      
+      // Replace "Awaiting Signature" with actual signature image
+      const sigLineRegex = new RegExp(`<div class="signature-line" id="sig-${role}">Awaiting Signature</div>`);
+      html = html.replace(sigLineRegex, `<div class="signature-line" id="sig-${role}"><img src="${sig.signature_data}" alt="${role} signature" /></div>`);
+      
+      // Replace date placeholder
+      const dateRegex = new RegExp(`<div class="signature-date" id="sig-${role}-date">Date: ___________</div>`);
+      html = html.replace(dateRegex, `<div class="signature-date" id="sig-${role}-date">${sigDate}</div>`);
+    }
+
+    res.json({ success: true, html, document_id: docs[0].id, signatures });
+  } catch (error) {
+    console.error("Error viewing contract:", error);
     res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 });
@@ -745,12 +1054,27 @@ router.get("/:id", async (req, res) => {
       [id]
     );
 
-    // Get history
+    // Get history (filtered for Owner)
+    const { role } = req.query;
+    let historyFilter = "";
+    if (role === "owner") {
+      historyFilter = ` AND action NOT IN (
+        'engagement_created', 
+        'broker_drafted_offer', 
+        'buyer_approved_draft', 
+        'buyer_rejected_draft', 
+        'broker_sent_advice',
+        'broker_accepted',
+        'broker_declined'
+      ) `;
+    }
+
     const [history] = await db.query(
       `SELECT beh.*, u.name AS action_by_name
        FROM broker_engagement_history beh
        LEFT JOIN users u ON beh.action_by_id = u.id
-       WHERE beh.engagement_id = ? ORDER BY beh.created_at DESC`,
+       WHERE beh.engagement_id = ? ${historyFilter}
+       ORDER BY beh.created_at DESC`,
       [id]
     );
 

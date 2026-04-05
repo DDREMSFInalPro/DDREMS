@@ -633,9 +633,17 @@ router.post("/:agreementId/generate-agreement", async (req, res) => {
     const { agreementId } = req.params;
     const { admin_id, template_id } = req.body;
 
-    // Get agreement details
+    // Get agreement details with joined property and user data
     const [agreement] = await db.query(
-      "SELECT * FROM agreement_requests WHERE id = ?",
+      `SELECT a.*, 
+              p.title as property_title, p.location as property_location, p.type as property_type,
+              c.name as buyer_first, '' as buyer_last, c.email as buyer_email,
+              o.name as owner_first, '' as owner_last, o.email as owner_email
+       FROM agreement_requests a
+       LEFT JOIN properties p ON a.property_id = p.id
+       LEFT JOIN users c ON a.customer_id = c.id
+       LEFT JOIN users o ON a.owner_id = o.id
+       WHERE a.id = ?`,
       [agreementId],
     );
 
@@ -646,25 +654,152 @@ router.post("/:agreementId/generate-agreement", async (req, res) => {
       });
     }
 
-    // Get template
-    const [template] = await db.query(
-      "SELECT * FROM agreement_templates WHERE id = ?",
-      [template_id || 1],
-    );
+    const agr = agreement[0];
+    const agreedPrice = Number(agr.proposed_price || agr.property_price || 0);
+    const systemFee = (agreedPrice * 0.02).toFixed(2);
+    const ownerNet = (agreedPrice - Number(systemFee)).toFixed(2);
+    const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 
-    // Create agreement document using the final agreed price (proposed_price takes precedence)
-    const agreedPrice =
-      agreement[0].proposed_price || agreement[0].property_price;
-    const document_content = JSON.stringify({
-      agreement_id: agreementId,
-      customer_id: agreement[0].customer_id,
-      owner_id: agreement[0].owner_id,
-      property_id: agreement[0].property_id,
-      property_price: agreement[0].property_price,
-      agreed_price: agreedPrice,
-      template: template.length > 0 ? template[0].template_content : null,
-      created_date: new Date().toISOString(),
-    });
+    // Compile the rich HTML contract
+    const contractHTML = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Direct Purchase Agreement - DDREMS #${agr.id}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Georgia', 'Times New Roman', serif; color: #1a1a2e; background: #fff; padding: 50px; max-width: 900px; margin: 0 auto; line-height: 1.7; }
+    .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 100px; color: rgba(59, 130, 246, 0.04); font-weight: 900; letter-spacing: 10px; pointer-events: none; z-index: 0; }
+    .header { text-align: center; border-bottom: 4px double #16213e; padding-bottom: 24px; margin-bottom: 30px; position: relative; z-index: 1; }
+    .header .logo { font-size: 32px; font-weight: 900; color: #16213e; letter-spacing: 4px; margin-bottom: 4px; }
+    .header .subtitle { font-size: 18px; color: #0f3460; font-weight: 500; margin-bottom: 6px; }
+    .header .tagline { font-size: 12px; color: #6b7280; font-style: italic; }
+    .meta-row { display: flex; justify-content: space-between; font-size: 12px; color: #6b7280; margin-bottom: 24px; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; }
+    .section { margin-bottom: 28px; position: relative; z-index: 1; }
+    .section-title { font-size: 15px; font-weight: 700; color: #16213e; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 2px solid #3b82f6; padding-bottom: 6px; margin-bottom: 14px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .info-item { padding: 10px 14px; background: #f8fafc; border-radius: 6px; border-left: 3px solid #3b82f6; }
+    .info-item label { display: block; font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 2px; }
+    .info-item span { font-size: 14px; font-weight: 600; color: #1e293b; }
+    .party-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .party-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; background: #fafbfc; }
+    .party-box h4 { color: #0f3460; margin-bottom: 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .party-box p { font-size: 12px; color: #374151; line-height: 1.6; }
+    .price-highlight { text-align: center; background: linear-gradient(135deg, #1e3a5f, #16213e); color: #fff; border-radius: 10px; padding: 20px; margin: 16px 0; }
+    .price-highlight .label { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.8; margin-bottom: 4px; }
+    .price-highlight .amount { font-size: 36px; font-weight: 900; letter-spacing: 1px; }
+    .breakdown-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .breakdown-table th, .breakdown-table td { padding: 10px 14px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+    .breakdown-table th { background: #f1f5f9; color: #374151; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+    .breakdown-table td.amount { text-align: right; font-weight: 600; }
+    .breakdown-table tr.total td { border-top: 2px solid #16213e; font-weight: 800; font-size: 14px; }
+    .terms-text { padding: 18px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 13px; line-height: 1.9; }
+    .terms-text ol { padding-left: 20px; }
+    .terms-text li { margin-bottom: 8px; }
+    .signature-section { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 32px; padding-top: 24px; border-top: 3px double #e2e8f0; }
+    .signature-box { text-align: center; }
+    .signature-box h4 { font-size: 12px; color: #16213e; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+    .signature-line { border: 2px solid #d1d5db; border-radius: 8px; height: 80px; margin-bottom: 6px; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-style: italic; font-size: 12px; background: #fefefe; overflow: hidden; }
+    .signature-line img { max-height: 72px; max-width: 90%; }
+    .signature-name { font-size: 12px; color: #374151; border-top: 1px solid #374151; padding-top: 4px; margin-top: 4px; }
+    .signature-date { font-size: 10px; color: #6b7280; margin-top: 2px; }
+    .footer { text-align: center; margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #9ca3af; }
+    .footer p { margin-bottom: 2px; }
+    .stamp { display: inline-block; border: 2px solid #3b82f6; border-radius: 8px; padding: 4px 12px; font-size: 10px; color: #3b82f6; font-weight: 700; letter-spacing: 1px; margin-top: 8px; }
+    @media print { body { padding: 20px; } .watermark { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="watermark">DDREMS</div>
+  <div class="header">
+    <div class="logo">DDREMS</div>
+    <div class="subtitle">Direct Property Purchase Agreement</div>
+    <div class="tagline">Dire Dawa Real Estate Management System</div>
+  </div>
+  <div class="meta-row">
+    <span>Agreement Reference: <strong>AGR-${String(agr.id).padStart(5, '0')}</strong></span>
+    <span>Date: <strong>${today}</strong></span>
+    <span>Status: <strong>Pending Signatures</strong></span>
+  </div>
+  <div class="section">
+    <h3 class="section-title">🏠 Property Information</h3>
+    <div class="info-grid">
+      <div class="info-item"><label>Property Title</label><span>${agr.property_title || "N/A"}</span></div>
+      <div class="info-item"><label>Location</label><span>${agr.property_location || "N/A"}</span></div>
+      <div class="info-item"><label>Property Type</label><span>${(agr.property_type || "N/A").charAt(0).toUpperCase() + (agr.property_type || "").slice(1)}</span></div>
+      <div class="info-item"><label>Listed Price</label><span>${Number(agr.property_price || 0).toLocaleString()} ETB</span></div>
+    </div>
+  </div>
+  <div class="section">
+    <h3 class="section-title">👥 Parties to this Agreement</h3>
+    <div class="party-grid">
+      <div class="party-box">
+        <h4>🙋 Buyer</h4>
+        <p><strong>${agr.buyer_first} ${agr.buyer_last}</strong></p>
+        <p>${agr.buyer_email || "N/A"}</p>
+      </div>
+      <div class="party-box">
+        <h4>🏢 Property Owner</h4>
+        <p><strong>${agr.owner_first} ${agr.owner_last}</strong></p>
+        <p>${agr.owner_email || "N/A"}</p>
+      </div>
+    </div>
+  </div>
+  <div class="section">
+    <h3 class="section-title">💰 Agreed Transaction Price</h3>
+    <div class="price-highlight">
+      <div class="label">Final Agreed Price</div>
+      <div class="amount">${agreedPrice.toLocaleString()} ETB</div>
+    </div>
+  </div>
+  <div class="section">
+    <h3 class="section-title">📊 Financial Breakdown</h3>
+    <table class="breakdown-table">
+      <thead><tr><th>Description</th><th style="text-align:right">Amount</th></tr></thead>
+      <tbody>
+        <tr><td>Agreed Purchase Price</td><td class="amount">${agreedPrice.toLocaleString()} ETB</td></tr>
+        <tr><td>System Service Fee (2%)</td><td class="amount">- ${Number(systemFee).toLocaleString()} ETB</td></tr>
+        <tr class="total"><td>Net Amount to Owner</td><td class="amount">${Number(ownerNet).toLocaleString()} ETB</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="section">
+    <h3 class="section-title">📝 Terms and Conditions</h3>
+    <div class="terms-text">
+      <ol>
+        <li><strong>Sale Agreement:</strong> The Buyer agrees to purchase, and the Owner agrees to sell, the above-described property at the agreed price of <strong>${agreedPrice.toLocaleString()} ETB</strong>.</li>
+        <li><strong>System Fee:</strong> The transaction is subject to a 2% platform facilitation fee deducted from the final payout to the owner.</li>
+        <li><strong>Payment:</strong> The Buyer shall submit the full agreed amount via the DDREMS platform. Payment must be verified by a system administrator before the ownership transfer can proceed.</li>
+        <li><strong>Property Handover:</strong> Upon payment verification, the Owner shall hand over the property to the Buyer within <strong>14 business days</strong> unless otherwise agreed upon.</li>
+        <li><strong>Resolutions:</strong> Disputes arising from this agreement shall be resolved through mediation facilitated by the DDREMS administration.</li>
+        <li><strong>Signatures:</strong> Digital signatures applied through DDREMS are legally binding.</li>
+      </ol>
+    </div>
+  </div>
+  <div class="section">
+    <h3 class="section-title">✍️ Digital Signatures</h3>
+    <div class="signature-section">
+      <div class="signature-box">
+        <h4>Buyer</h4>
+        <div class="signature-line" id="sig-buyer">Awaiting Signature</div>
+        <div class="signature-name">${agr.buyer_first} ${agr.buyer_last}</div>
+        <div class="signature-date" id="sig-buyer-date">Date: ___________</div>
+      </div>
+      <div class="signature-box">
+        <h4>Property Owner</h4>
+        <div class="signature-line" id="sig-owner">Awaiting Signature</div>
+        <div class="signature-name">${agr.owner_first} ${agr.owner_last}</div>
+        <div class="signature-date" id="sig-owner-date">Date: ___________</div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <p>This document was generated by the Dire Dawa Real Estate Management System (DDREMS)</p>
+    <p>Agreement Reference: AGR-${String(agr.id).padStart(5, '0')} | Generated: ${today}</p>
+    <div class="stamp">OFFICIAL DDREMS DOCUMENT</div>
+  </div>
+</body>
+</html>`;
 
     const [docResult] = await db.query(
       `
@@ -673,7 +808,7 @@ router.post("/:agreementId/generate-agreement", async (req, res) => {
         document_content, generated_by_id
       ) VALUES (?, 1, 'initial', ?, ?)
     `,
-      [agreementId, document_content, admin_id],
+      [agreementId, contractHTML, admin_id],
     );
 
     // Update agreement
@@ -736,13 +871,13 @@ router.post("/:agreementId/generate-agreement", async (req, res) => {
 // ============================================================================
 
 // GET /api/agreement-workflow/:agreementId/view-agreement
-// View the generated agreement document
+// View the generated agreement document with live signatures
 router.get("/:agreementId/view-agreement", async (req, res) => {
   try {
     const { agreementId } = req.params;
 
     const [docs] = await db.query(
-      "SELECT * FROM agreement_documents WHERE agreement_request_id = ? AND is_active = TRUE ORDER BY version DESC LIMIT 1",
+      "SELECT * FROM agreement_documents WHERE agreement_request_id = ? ORDER BY version DESC LIMIT 1",
       [agreementId],
     );
 
@@ -751,6 +886,39 @@ router.get("/:agreementId/view-agreement", async (req, res) => {
         .status(404)
         .json({ success: false, message: "No agreement document found" });
     }
+
+    let contractHTML = docs[0].document_content;
+
+    // Fetch signatures and explicitly inject them
+    const [signatures] = await db.query(
+      "SELECT signer_role, signature_data, signed_at FROM agreement_signatures WHERE agreement_request_id = ?",
+      [agreementId]
+    );
+
+    const formatSigDate = (dateString) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) +
+             " " + date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    };
+
+    signatures.forEach(sig => {
+      const sigImg = sig.signature_data.startsWith("data:image") 
+          ? `<img src="${sig.signature_data}" alt="${sig.signer_role} signature" />`
+          : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1e3a5f;">${sig.signature_data}</div>`;
+      
+      const sigDate = formatSigDate(sig.signed_at);
+
+      if (sig.signer_role === 'buyer') {
+        contractHTML = contractHTML.replace('<div class="signature-line" id="sig-buyer">Awaiting Signature</div>', `<div class="signature-line" id="sig-buyer">${sigImg}</div>`);
+        contractHTML = contractHTML.replace('<div class="signature-date" id="sig-buyer-date">Date: ___________</div>', `<div class="signature-date" id="sig-buyer-date">Date: ${sigDate}</div>`);
+      } else if (sig.signer_role === 'owner') {
+        contractHTML = contractHTML.replace('<div class="signature-line" id="sig-owner">Awaiting Signature</div>', `<div class="signature-line" id="sig-owner">${sigImg}</div>`);
+        contractHTML = contractHTML.replace('<div class="signature-date" id="sig-owner-date">Date: ___________</div>', `<div class="signature-date" id="sig-owner-date">Date: ${sigDate}</div>`);
+      }
+    });
+
+    docs[0].document_content = contractHTML;
 
     res.json({ success: true, document: docs[0] });
   } catch (error) {
@@ -1619,7 +1787,8 @@ router.get("/user/:userId", async (req, res) => {
 router.get("/admin/pending", async (req, res) => {
   try {
     const [agreements] = await db.query(`
-      SELECT * FROM v_agreement_status 
+      SELECT v.*, (SELECT receipt_file_path FROM agreement_payments p WHERE p.agreement_request_id = v.id ORDER BY p.id DESC LIMIT 1) as receipt_document 
+      FROM v_agreement_status v
       WHERE status IN (
         'pending_admin_review',
         'owner_accepted',
@@ -1649,7 +1818,8 @@ router.get("/admin/pending", async (req, res) => {
 router.get("/admin/all", async (req, res) => {
   try {
     const [agreements] = await db.query(`
-      SELECT * FROM v_agreement_status 
+      SELECT v.*, (SELECT receipt_file_path FROM agreement_payments p WHERE p.agreement_request_id = v.id ORDER BY p.id DESC LIMIT 1) as receipt_document 
+      FROM v_agreement_status v
       ORDER BY created_at DESC
     `);
 
@@ -1675,7 +1845,8 @@ router.get("/owner/:ownerId", async (req, res) => {
     const { ownerId } = req.params;
     const [agreements] = await db.query(
       `
-      SELECT * FROM v_agreement_status 
+      SELECT v.*, (SELECT receipt_file_path FROM agreement_payments p WHERE p.agreement_request_id = v.id ORDER BY p.id DESC LIMIT 1) as receipt_document 
+      FROM v_agreement_status v
       WHERE owner_id = ?
       ORDER BY created_at DESC
     `,
@@ -1704,7 +1875,8 @@ router.get("/buyer/:buyerId", async (req, res) => {
     const { buyerId } = req.params;
     const [agreements] = await db.query(
       `
-      SELECT * FROM v_agreement_status 
+      SELECT v.*, (SELECT receipt_file_path FROM agreement_payments p WHERE p.agreement_request_id = v.id ORDER BY p.id DESC LIMIT 1) as receipt_document 
+      FROM v_agreement_status v
       WHERE customer_id = ?
       ORDER BY created_at DESC
     `,
