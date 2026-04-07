@@ -68,6 +68,10 @@ app.use(
   "/api/broker-engagement",
   require("./routes/broker-engagement"),
 );
+app.use(
+  "/api/rental-payments",
+  require("./routes/rental-payments"),
+);
 
 const PORT = process.env.PORT || 5000;
 

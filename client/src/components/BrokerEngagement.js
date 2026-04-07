@@ -40,6 +40,7 @@ const BrokerEngagement = ({ user }) => {
   const [history, setHistory] = useState([]);
   const [signatures, setSignatures] = useState([]);
   const [contractHTML, setContractHTML] = useState("");
+  const [viewedEngagements, setViewedEngagements] = useState({});
   const [pdfLoading, setPdfLoading] = useState(false);
   const contractRef = useRef(null);
 
@@ -116,6 +117,7 @@ const BrokerEngagement = ({ user }) => {
       try {
         const cRes = await axios.get(`${API}/${engagement.id}/view-contract`);
         setContractHTML(cRes.data.html || "");
+        setViewedEngagements((prev) => ({ ...prev, [engagement.id]: true }));
       } catch (err) {
         console.error("Error fetching contract:", err);
         setContractHTML("<p>Contract not found or not yet generated.</p>");
@@ -233,6 +235,10 @@ const BrokerEngagement = ({ user }) => {
             property_id: formData.property_id,
             starting_offer: formData.starting_offer,
             buyer_message: formData.message,
+            engagement_type: formData.engagement_type,
+            rental_duration_months: formData.rental_duration_months,
+            payment_schedule: formData.payment_schedule,
+            security_deposit: formData.security_deposit,
           };
           if (!data.broker_id || !data.property_id) {
             alert("Please select a broker and property.");
@@ -575,10 +581,20 @@ const BrokerEngagement = ({ user }) => {
         <div className="eng-info-grid">
           <div className="info-item"><span className="info-label">🏠 Property</span><span className="info-value">{eng.property_title || "N/A"}</span></div>
           <div className="info-item"><span className="info-label">📍 Location</span><span className="info-value">{eng.property_location || "N/A"}</span></div>
-          <div className="info-item"><span className="info-label">👤 Buyer</span><span className="info-value">{eng.buyer_name || "N/A"}</span></div>
+          <div className="info-item"><span className="info-label">👤 {eng.engagement_type === 'rent' ? 'Tenant' : 'Buyer'}</span><span className="info-value">{eng.buyer_name || "N/A"}</span></div>
           <div className="info-item"><span className="info-label">🤵 Broker</span><span className="info-value">{eng.broker_name || "N/A"}</span></div>
-          <div className="info-item"><span className="info-label">🏢 Owner</span><span className="info-value">{eng.owner_name || "N/A"}</span></div>
+          <div className="info-item"><span className="info-label">🏢 {eng.engagement_type === 'rent' ? 'Landlord' : 'Owner'}</span><span className="info-value">{eng.owner_name || "N/A"}</span></div>
           <div className="info-item"><span className="info-label">📆 Created</span><span className="info-value">{new Date(eng.created_at).toLocaleDateString()}</span></div>
+          {eng.engagement_type === 'rent' && (
+            <>
+              <div className="info-item"><span className="info-label">🏷️ Type</span><span className="info-value" style={{color: '#065f46', fontWeight: 700}}>Rental</span></div>
+              <div className="info-item"><span className="info-label">📅 Duration</span><span className="info-value">{eng.rental_duration_months} Months</span></div>
+              <div className="info-item"><span className="info-label">🗓️ Schedule</span><span className="info-value" style={{textTransform:'capitalize'}}>{eng.payment_schedule || 'monthly'}</span></div>
+              {eng.security_deposit > 0 && (
+                <div className="info-item"><span className="info-label">🔒 Deposit</span><span className="info-value">{Number(eng.security_deposit).toLocaleString()} ETB</span></div>
+              )}
+            </>
+          )}
         </div>
 
         {/* Offer comparison boxes */}
@@ -650,15 +666,20 @@ const BrokerEngagement = ({ user }) => {
     if (!showModal) return null;
 
     switch (modalType) {
-      case "hire":
+      case "hire": {
+        const selectedProp = properties.find(p => p.id === Number(formData.property_id));
+        const isRentalProp = selectedProp?.listing_type === 'rent' || formData.engagement_type === 'rent';
         return (
           <>
             <div className="eng-form-group">
               <label>Select Property *</label>
-              <select value={formData.property_id || ""} onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}>
+              <select value={formData.property_id || ""} onChange={(e) => {
+                const prop = properties.find(p => p.id === Number(e.target.value));
+                setFormData({ ...formData, property_id: e.target.value, engagement_type: prop?.listing_type || 'sale' });
+              }}>
                 <option value="">-- Choose a property --</option>
                 {properties.map((p) => (
-                  <option key={p.id} value={p.id}>{p.title} — {Number(p.price).toLocaleString()} ETB ({p.location})</option>
+                  <option key={p.id} value={p.id}>{p.title} — {Number(p.price).toLocaleString()} ETB ({p.location}) {p.listing_type === 'rent' ? '🔑 Rent' : '🏷️ Sale'}</option>
                 ))}
               </select>
             </div>
@@ -679,15 +700,37 @@ const BrokerEngagement = ({ user }) => {
               </div>
             </div>
             <div className="eng-form-group">
-              <label>Starting Offer Price (ETB)</label>
-              <input type="number" value={formData.starting_offer || ""} onChange={(e) => setFormData({ ...formData, starting_offer: e.target.value })} placeholder="Enter your starting offer price" />
+              <label>{isRentalProp ? 'Starting Monthly Rent Offer (ETB)' : 'Starting Offer Price (ETB)'}</label>
+              <input type="number" value={formData.starting_offer || ""} onChange={(e) => setFormData({ ...formData, starting_offer: e.target.value })} placeholder={isRentalProp ? 'Enter your proposed monthly rent' : 'Enter your starting offer price'} />
             </div>
+            {isRentalProp && (
+              <>
+                <div className="eng-form-group">
+                  <label>Lease Duration (Months) *</label>
+                  <input type="number" min="1" value={formData.rental_duration_months || 12} onChange={(e) => setFormData({ ...formData, rental_duration_months: e.target.value })} />
+                </div>
+                <div className="eng-form-group">
+                  <label>Payment Schedule</label>
+                  <select value={formData.payment_schedule || 'monthly'} onChange={(e) => setFormData({ ...formData, payment_schedule: e.target.value })}>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="semi_annual">Semi-Annually</option>
+                    <option value="annual">Annually</option>
+                  </select>
+                </div>
+                <div className="eng-form-group">
+                  <label>Security Deposit (ETB)</label>
+                  <input type="number" value={formData.security_deposit || ""} onChange={(e) => setFormData({ ...formData, security_deposit: e.target.value })} placeholder="e.g. 50000" />
+                </div>
+              </>
+            )}
             <div className="eng-form-group">
               <label>Message to Broker</label>
               <textarea value={formData.message || ""} onChange={(e) => setFormData({ ...formData, message: e.target.value })} placeholder="Tell the broker about your requirements, budget, expectations..." rows="3" />
             </div>
           </>
         );
+      }
 
       case "broker_accept":
         return (
@@ -915,6 +958,7 @@ const BrokerEngagement = ({ user }) => {
         );
 
       case "sign":
+        const hasViewed = viewedEngagements[selectedEngagement?.id];
         return (
           <div style={{ textAlign: "center", padding: 20 }}>
             <p style={{ fontSize: 48, margin: "0 0 12px" }}>✍️</p>
@@ -927,6 +971,11 @@ const BrokerEngagement = ({ user }) => {
               Signing as: <strong>{user.name}</strong> ({isBuyer ? "Buyer" : isBroker ? "Broker" : "Owner"})
               <br />Timestamp will be recorded for legal purposes.
             </p>
+            {!hasViewed && (
+              <div style={{ color: "#ef4444", fontSize: 13, background: "#fee2e2", padding: 12, borderRadius: 8, marginTop: 16 }}>
+                ⚠️ You must view/read the PDF agreement before you can sign.
+              </div>
+            )}
           </div>
         );
 
@@ -1098,14 +1147,26 @@ const BrokerEngagement = ({ user }) => {
             <div className="eng-detail-grid">
               <div className="detail-item"><span className="detail-label">Property</span><span className="detail-value">{eng?.property_title}</span></div>
               <div className="detail-item"><span className="detail-label">Location</span><span className="detail-value">{eng?.property_location}</span></div>
-              <div className="detail-item"><span className="detail-label">Buyer</span><span className="detail-value">{eng?.buyer_name}</span></div>
+              <div className="detail-item"><span className="detail-label">{eng?.engagement_type === 'rent' ? 'Tenant' : 'Buyer'}</span><span className="detail-value">{eng?.buyer_name}</span></div>
               <div className="detail-item"><span className="detail-label">Broker</span><span className="detail-value">{eng?.broker_name}</span></div>
-              <div className="detail-item"><span className="detail-label">Owner</span><span className="detail-value">{eng?.owner_name}</span></div>
-              {!isOwner && (
-                <div className="detail-item"><span className="detail-label">Starting Offer</span><span className="detail-value">{Number(eng?.starting_offer || 0).toLocaleString()} ETB</span></div>
+              <div className="detail-item"><span className="detail-label">{eng?.engagement_type === 'rent' ? 'Landlord' : 'Owner'}</span><span className="detail-value">{eng?.owner_name}</span></div>
+              {eng?.engagement_type === 'rent' && (
+                <div className="detail-item"><span className="detail-label">Transaction Type</span><span className="detail-value" style={{color: '#065f46', fontWeight: 700}}>🔑 Rental</span></div>
               )}
-              <div className="detail-item"><span className="detail-label">Current Offer</span><span className="detail-value">{Number(eng?.current_offer || 0).toLocaleString()} ETB</span></div>
-              {eng?.agreed_price && <div className="detail-item"><span className="detail-label">Agreed Price</span><span className="detail-value" style={{ color: "#059669", fontWeight: 700 }}>{Number(eng.agreed_price).toLocaleString()} ETB</span></div>}
+              {!isOwner && (
+                <div className="detail-item"><span className="detail-label">Starting Offer</span><span className="detail-value">{Number(eng?.starting_offer || 0).toLocaleString()} ETB{eng?.engagement_type === 'rent' ? ' / month' : ''}</span></div>
+              )}
+              <div className="detail-item"><span className="detail-label">Current Offer</span><span className="detail-value">{Number(eng?.current_offer || 0).toLocaleString()} ETB{eng?.engagement_type === 'rent' ? ' / month' : ''}</span></div>
+              {eng?.agreed_price && <div className="detail-item"><span className="detail-label">Agreed {eng?.engagement_type === 'rent' ? 'Rent' : 'Price'}</span><span className="detail-value" style={{ color: "#059669", fontWeight: 700 }}>{Number(eng.agreed_price).toLocaleString()} ETB{eng?.engagement_type === 'rent' ? ' / month' : ''}</span></div>}
+              {eng?.engagement_type === 'rent' && (
+                <>
+                  <div className="detail-item"><span className="detail-label">Lease Duration</span><span className="detail-value">{eng.rental_duration_months} Months</span></div>
+                  <div className="detail-item"><span className="detail-label">Payment Schedule</span><span className="detail-value" style={{textTransform:'capitalize'}}>{eng.payment_schedule || 'monthly'}</span></div>
+                  {eng.security_deposit > 0 && (
+                    <div className="detail-item"><span className="detail-label">Security Deposit</span><span className="detail-value">{Number(eng.security_deposit).toLocaleString()} ETB</span></div>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Signatures */}
@@ -1341,7 +1402,11 @@ const BrokerEngagement = ({ user }) => {
             {showSubmitButton && (
               <div className="eng-modal-footer">
                 <button className="eng-btn eng-btn-outline" onClick={closeModal}>Cancel</button>
-                <button className="eng-btn eng-btn-primary" onClick={submitAction} disabled={actionLoading}>
+                <button 
+                  className="eng-btn eng-btn-primary" 
+                  onClick={submitAction} 
+                  disabled={actionLoading || (modalType === "sign" && !viewedEngagements[selectedEngagement?.id])}
+                >
                   {actionLoading ? "Processing..." : "Confirm"}
                 </button>
               </div>

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../config/db");
+const { generateRentalSchedule } = require("./rental-payments");
 
 // ============================================================================
 // STEP 1: CUSTOMER INITIATES REQUEST
@@ -16,6 +17,10 @@ router.post("/request", async (req, res) => {
       customer_notes,
       proposed_price,
       move_in_date,
+      agreement_type,
+      rental_duration_months,
+      payment_schedule,
+      security_deposit,
     } = req.body;
 
     if (!customer_id || !property_id) {
@@ -27,7 +32,7 @@ router.post("/request", async (req, res) => {
 
     // Get property details to find owner
     const [property] = await db.query(
-      "SELECT owner_id, price, broker_id FROM properties WHERE id = ?",
+      "SELECT owner_id, price, broker_id, listing_type FROM properties WHERE id = ?",
       [property_id],
     );
 
@@ -41,6 +46,7 @@ router.post("/request", async (req, res) => {
     const owner_id = property[0].owner_id;
     const property_price = property[0].price;
     const broker_id = property[0].broker_id || null;
+    const resolvedType = agreement_type || property[0].listing_type || 'sale';
 
     // Check if property has an owner
     if (!owner_id) {
@@ -68,8 +74,9 @@ router.post("/request", async (req, res) => {
       `
       INSERT INTO agreement_requests (
         customer_id, owner_id, property_id, broker_id, status, current_step,
-        customer_notes, property_price, proposed_price, move_in_date
-      ) VALUES (?, ?, ?, ?, 'pending_admin_review', 1, ?, ?, ?, ?)
+        customer_notes, property_price, proposed_price, move_in_date,
+        agreement_type, rental_duration_months, payment_schedule, security_deposit
+      ) VALUES (?, ?, ?, ?, 'pending_admin_review', 1, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       [
         customer_id,
@@ -80,6 +87,10 @@ router.post("/request", async (req, res) => {
         property_price,
         proposed_price || property_price,
         move_in_date || null,
+        resolvedType,
+        resolvedType === 'rent' ? (rental_duration_months || 12) : null,
+        resolvedType === 'rent' ? (payment_schedule || 'monthly') : null,
+        resolvedType === 'rent' ? (security_deposit || null) : null,
       ],
     );
 
@@ -655,18 +666,18 @@ router.post("/:agreementId/generate-agreement", async (req, res) => {
     }
 
     const agr = agreement[0];
+    const isRental = agr.agreement_type === 'rent';
     const agreedPrice = Number(agr.proposed_price || agr.property_price || 0);
     const systemFee = (agreedPrice * 0.02).toFixed(2);
     const ownerNet = (agreedPrice - Number(systemFee)).toFixed(2);
     const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    const rentalMonths = agr.rental_duration_months || 12;
+    const paymentSchedule = agr.payment_schedule || 'monthly';
+    const securityDeposit = Number(agr.security_deposit || 0);
+    const moveInDate = agr.move_in_date ? new Date(agr.move_in_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : 'To Be Determined';
 
-    // Compile the rich HTML contract
-    const contractHTML = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Direct Purchase Agreement - DDREMS #${agr.id}</title>
-  <style>
+    // ── Shared CSS styles ──
+    const sharedStyles = `
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Georgia', 'Times New Roman', serif; color: #1a1a2e; background: #fff; padding: 50px; max-width: 900px; margin: 0 auto; line-height: 1.7; }
     .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 100px; color: rgba(59, 130, 246, 0.04); font-weight: 900; letter-spacing: 10px; pointer-events: none; z-index: 0; }
@@ -685,7 +696,7 @@ router.post("/:agreementId/generate-agreement", async (req, res) => {
     .party-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; background: #fafbfc; }
     .party-box h4 { color: #0f3460; margin-bottom: 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
     .party-box p { font-size: 12px; color: #374151; line-height: 1.6; }
-    .price-highlight { text-align: center; background: linear-gradient(135deg, #1e3a5f, #16213e); color: #fff; border-radius: 10px; padding: 20px; margin: 16px 0; }
+    .price-highlight { text-align: center; border-radius: 10px; padding: 20px; margin: 16px 0; }
     .price-highlight .label { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.8; margin-bottom: 4px; }
     .price-highlight .amount { font-size: 36px; font-weight: 900; letter-spacing: 1px; }
     .breakdown-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -707,6 +718,140 @@ router.post("/:agreementId/generate-agreement", async (req, res) => {
     .footer p { margin-bottom: 2px; }
     .stamp { display: inline-block; border: 2px solid #3b82f6; border-radius: 8px; padding: 4px 12px; font-size: 10px; color: #3b82f6; font-weight: 700; letter-spacing: 1px; margin-top: 8px; }
     @media print { body { padding: 20px; } .watermark { display: none; } }
+    `;
+
+    let contractHTML;
+
+    if (isRental) {
+      // ── RENTAL / LEASE AGREEMENT TEMPLATE ──
+      const monthlyRent = agreedPrice;
+      const totalRent = monthlyRent * rentalMonths;
+      const scheduleLabel = paymentSchedule.charAt(0).toUpperCase() + paymentSchedule.slice(1);
+
+      contractHTML = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Residential Lease Agreement - DDREMS #${agr.id}</title>
+  <style>${sharedStyles}
+    .price-highlight { background: linear-gradient(135deg, #065f46, #064e3b); color: #fff; }
+    .rental-badge { display: inline-block; background: #d1fae5; color: #065f46; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 1px; margin-left: 8px; }
+  </style>
+</head>
+<body>
+  <div class="watermark">DDREMS</div>
+  <div class="header">
+    <div class="logo">DDREMS</div>
+    <div class="subtitle">Residential Lease Agreement <span class="rental-badge">Rental</span></div>
+    <div class="tagline">Dire Dawa Real Estate Management System</div>
+  </div>
+  <div class="meta-row">
+    <span>Agreement Reference: <strong>LEASE-${String(agr.id).padStart(5, '0')}</strong></span>
+    <span>Date: <strong>${today}</strong></span>
+    <span>Status: <strong>Pending Signatures</strong></span>
+  </div>
+  <div class="section">
+    <h3 class="section-title">🏠 Property Information</h3>
+    <div class="info-grid">
+      <div class="info-item"><label>Property Title</label><span>${agr.property_title || "N/A"}</span></div>
+      <div class="info-item"><label>Location</label><span>${agr.property_location || "N/A"}</span></div>
+      <div class="info-item"><label>Property Type</label><span>${(agr.property_type || "N/A").charAt(0).toUpperCase() + (agr.property_type || "").slice(1)}</span></div>
+      <div class="info-item"><label>Listing Type</label><span>For Rent</span></div>
+    </div>
+  </div>
+  <div class="section">
+    <h3 class="section-title">👥 Parties to this Lease</h3>
+    <div class="party-grid">
+      <div class="party-box">
+        <h4>🙋 Tenant (Lessee)</h4>
+        <p><strong>${agr.buyer_first} ${agr.buyer_last}</strong></p>
+        <p>${agr.buyer_email || "N/A"}</p>
+      </div>
+      <div class="party-box">
+        <h4>🏢 Landlord (Lessor)</h4>
+        <p><strong>${agr.owner_first} ${agr.owner_last}</strong></p>
+        <p>${agr.owner_email || "N/A"}</p>
+      </div>
+    </div>
+  </div>
+  <div class="section">
+    <h3 class="section-title">📅 Lease Terms</h3>
+    <div class="info-grid">
+      <div class="info-item"><label>Lease Duration</label><span>${rentalMonths} Month${rentalMonths > 1 ? 's' : ''}</span></div>
+      <div class="info-item"><label>Payment Schedule</label><span>${scheduleLabel}</span></div>
+      <div class="info-item"><label>Move-In Date</label><span>${moveInDate}</span></div>
+      <div class="info-item"><label>Security Deposit</label><span>${securityDeposit > 0 ? securityDeposit.toLocaleString() + ' ETB' : 'None'}</span></div>
+    </div>
+  </div>
+  <div class="section">
+    <h3 class="section-title">💰 Rent Amount</h3>
+    <div class="price-highlight">
+      <div class="label">Monthly Rent</div>
+      <div class="amount">${monthlyRent.toLocaleString()} ETB</div>
+    </div>
+  </div>
+  <div class="section">
+    <h3 class="section-title">📊 Financial Summary</h3>
+    <table class="breakdown-table">
+      <thead><tr><th>Description</th><th style="text-align:right">Amount</th></tr></thead>
+      <tbody>
+        <tr><td>Monthly Rent</td><td class="amount">${monthlyRent.toLocaleString()} ETB</td></tr>
+        <tr><td>Lease Duration</td><td class="amount">${rentalMonths} months</td></tr>
+        ${securityDeposit > 0 ? `<tr><td>Security Deposit (refundable)</td><td class="amount">${securityDeposit.toLocaleString()} ETB</td></tr>` : ''}
+        <tr><td>System Service Fee (2%)</td><td class="amount">- ${Number(systemFee).toLocaleString()} ETB / month</td></tr>
+        <tr class="total"><td>Total Lease Value</td><td class="amount">${totalRent.toLocaleString()} ETB</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="section">
+    <h3 class="section-title">📝 Lease Terms and Conditions</h3>
+    <div class="terms-text">
+      <ol>
+        <li><strong>Lease Agreement:</strong> The Landlord agrees to lease, and the Tenant agrees to rent, the above-described property at a monthly rent of <strong>${monthlyRent.toLocaleString()} ETB</strong> for a period of <strong>${rentalMonths} months</strong>.</li>
+        <li><strong>Rent Payments:</strong> Rent is due on the <strong>1st of each month</strong>, payable via the DDREMS platform. Late payments may be subject to penalties as per local regulations.</li>
+        <li><strong>Security Deposit:</strong> ${securityDeposit > 0 ? `A security deposit of <strong>${securityDeposit.toLocaleString()} ETB</strong> shall be paid by the Tenant before move-in. The deposit will be refunded within 30 days of lease termination, less any deductions for damages or unpaid rent.` : 'No security deposit is required for this lease.'}</li>
+        <li><strong>Move-In Date:</strong> The Tenant shall take possession of the property on <strong>${moveInDate}</strong>.</li>
+        <li><strong>Maintenance:</strong> The Tenant shall maintain the property in good condition. Major structural repairs remain the responsibility of the Landlord.</li>
+        <li><strong>Termination:</strong> Either party may terminate the lease with <strong>30 days written notice</strong>. Early termination by the Tenant may result in forfeiture of the security deposit.</li>
+        <li><strong>System Fee:</strong> A 2% platform facilitation fee is deducted from each payment to the Landlord.</li>
+        <li><strong>Disputes:</strong> Disputes arising from this lease shall be resolved through mediation facilitated by the DDREMS administration.</li>
+        <li><strong>Signatures:</strong> Digital signatures applied through DDREMS are legally binding.</li>
+      </ol>
+    </div>
+  </div>
+  <div class="section">
+    <h3 class="section-title">✍️ Digital Signatures</h3>
+    <div class="signature-section">
+      <div class="signature-box">
+        <h4>Tenant</h4>
+        <div class="signature-line" id="sig-buyer">Awaiting Signature</div>
+        <div class="signature-name">${agr.buyer_first} ${agr.buyer_last}</div>
+        <div class="signature-date" id="sig-buyer-date">Date: ___________</div>
+      </div>
+      <div class="signature-box">
+        <h4>Landlord</h4>
+        <div class="signature-line" id="sig-owner">Awaiting Signature</div>
+        <div class="signature-name">${agr.owner_first} ${agr.owner_last}</div>
+        <div class="signature-date" id="sig-owner-date">Date: ___________</div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <p>This document was generated by the Dire Dawa Real Estate Management System (DDREMS)</p>
+    <p>Agreement Reference: LEASE-${String(agr.id).padStart(5, '0')} | Generated: ${today}</p>
+    <div class="stamp">OFFICIAL DDREMS LEASE DOCUMENT</div>
+  </div>
+</body>
+</html>`;
+    } else {
+      // ── PURCHASE AGREEMENT TEMPLATE (original) ──
+      contractHTML = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Direct Purchase Agreement - DDREMS #${agr.id}</title>
+  <style>${sharedStyles}
+    .price-highlight { background: linear-gradient(135deg, #1e3a5f, #16213e); color: #fff; }
   </style>
 </head>
 <body>
@@ -800,6 +945,7 @@ router.post("/:agreementId/generate-agreement", async (req, res) => {
   </div>
 </body>
 </html>`;
+    }
 
     const [docResult] = await db.query(
       `
@@ -1667,9 +1813,41 @@ router.put("/:agreementId/release-funds", async (req, res) => {
       );
     }
 
+    // Check if this is a rental agreement
+    const isRental = agreement[0].agreement_type === 'rental' || agreement[0].agreement_type === 'rent';
+
+    if (isRental) {
+      // Auto-generate rental payment schedule for months 2+
+      try {
+        const rentalMonths = Number(agreement[0].rental_duration_months) || 12;
+        const scheduleCount = await generateRentalSchedule({
+          agreementRequestId: Number(agreementId),
+          tenantId: agreement[0].customer_id,
+          ownerId: agreement[0].owner_id,
+          propertyId: agreement[0].property_id,
+          monthlyRent: property_price,
+          leaseDurationMonths: rentalMonths,
+          paymentSchedule: agreement[0].payment_schedule || 'monthly',
+          brokerCommissionPct: agreement[0].broker_id ? comm_pct : 0,
+          systemFeePct: 2,
+          brokerId: agreement[0].broker_id
+        });
+        console.log(`📅 Generated ${scheduleCount} rental payment installments for agreement #${agreementId}`);
+      } catch (schedErr) {
+        console.error("Rental schedule generation error (non-fatal):", schedErr.message);
+      }
+
+      // Mark property as rented
+      try {
+        await db.query("UPDATE properties SET status = 'rented' WHERE id = ?", [agreement[0].property_id]);
+      } catch (propErr) {
+        console.error("Property status update error (non-fatal):", propErr.message);
+      }
+    }
+
     res.json({
       success: true,
-      message: "Funds released. Transaction completed!",
+      message: isRental ? "First month processed. Rental schedule created!" : "Funds released. Transaction completed!",
       transaction_id: transactionResult.insertId,
       status: "completed",
       current_step: 11,

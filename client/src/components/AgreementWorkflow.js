@@ -237,6 +237,10 @@ const AgreementWorkflow = ({ user, onLogout }) => {
             proposed_price: formData.proposed_price,
             move_in_date: formData.move_in_date,
             customer_notes: formData.notes,
+            agreement_type: formData.agreement_type || 'sale',
+            rental_duration_months: formData.rental_duration_months,
+            payment_schedule: formData.payment_schedule,
+            security_deposit: formData.security_deposit,
           };
           break;
         case "forward":
@@ -399,23 +403,35 @@ const AgreementWorkflow = ({ user, onLogout }) => {
             <span className="lbl">🏠 Property</span>
             <span className="val">{agr.property_title || "N/A"}</span>
           </div>
+          {agr.agreement_type === 'rent' && (
+            <div className="info-row">
+              <span className="lbl">🏷️ Type</span>
+              <span className="val" style={{color: '#065f46', fontWeight: 700}}>🔑 Rental</span>
+            </div>
+          )}
           <div className="info-row">
-            <span className="lbl">👤 Buyer</span>
+            <span className="lbl">👤 {agr.agreement_type === 'rent' ? 'Tenant' : 'Buyer'}</span>
             <span className="val">{agr.customer_name || "N/A"}</span>
           </div>
           <div className="info-row">
-            <span className="lbl">🏢 Owner</span>
+            <span className="lbl">🏢 {agr.agreement_type === 'rent' ? 'Landlord' : 'Owner'}</span>
             <span className="val">{agr.owner_name || "N/A"}</span>
           </div>
           <div className="info-row">
-            <span className="lbl">💰 Price</span>
+            <span className="lbl">💰 {agr.agreement_type === 'rent' ? 'Rent' : 'Price'}</span>
             <span className="val">
               {Number(
                 agr.proposed_price || agr.property_price || 0,
               ).toLocaleString()}{" "}
-              ETB
+              ETB{agr.agreement_type === 'rent' ? ' / month' : ''}
             </span>
           </div>
+          {agr.agreement_type === 'rent' && agr.rental_duration_months && (
+            <div className="info-row">
+              <span className="lbl">📅 Duration</span>
+              <span className="val">{agr.rental_duration_months} Months</span>
+            </div>
+          )}
           {agr.move_in_date && (
             <div className="info-row">
               <span className="lbl">📅 Move-in</span>
@@ -642,9 +658,27 @@ const AgreementWorkflow = ({ user, onLogout }) => {
                 {Number(
                   a.proposed_price || a.property_price || 0,
                 ).toLocaleString()}{" "}
-                ETB
+                ETB {a.agreement_type === 'rent' ? '/ month' : ''}
               </span>
             </div>
+            {a.agreement_type === 'rent' && (
+              <>
+                <div>
+                  <strong>Lease Duration</strong>
+                  <span>{a.rental_duration_months} Months</span>
+                </div>
+                <div>
+                  <strong>Payment Schedule</strong>
+                  <span style={{textTransform: 'capitalize'}}>{a.payment_schedule || 'monthly'}</span>
+                </div>
+                {a.security_deposit > 0 && (
+                  <div>
+                    <strong>Security Deposit</strong>
+                    <span>{Number(a.security_deposit).toLocaleString()} ETB</span>
+                  </div>
+                )}
+              </>
+            )}
             {a.move_in_date && (
               <div>
                 <strong>Move-in Date</strong>
@@ -1252,16 +1286,17 @@ const AgreementWorkflow = ({ user, onLogout }) => {
             <label>Property *</label>
             <select
               value={formData.property_id || ""}
-              onChange={(e) =>
-                setFormData({ ...formData, property_id: e.target.value })
-              }
+              onChange={(e) => {
+                const prop = activeProperties.find(p => p.id === Number(e.target.value));
+                setFormData({ ...formData, property_id: e.target.value, agreement_type: prop?.listing_type || 'sale' });
+              }}
               required
             >
               <option value="">— Select a property —</option>
               {activeProperties.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.title} — 📍 {p.location} — {(p.price / 1000000).toFixed(2)}
-                  M ETB
+                  M ETB {p.listing_type === 'rent' ? '🔑 Rent' : '🏷️ Sale'}
                 </option>
               ))}
             </select>
@@ -1287,6 +1322,52 @@ const AgreementWorkflow = ({ user, onLogout }) => {
               }
             />
           </div>
+          {(() => {
+            const selectedProp = activeProperties.find(p => p.id === Number(formData.property_id));
+            const isRent = selectedProp?.listing_type === 'rent' || formData.agreement_type === 'rent';
+            if (!isRent) return null;
+            return (
+              <>
+                <div className="form-group">
+                  <label>Lease Duration (Months) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.rental_duration_months || 12}
+                    onChange={(e) =>
+                      setFormData({ ...formData, rental_duration_months: e.target.value, agreement_type: 'rent' })
+                    }
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Payment Schedule</label>
+                  <select
+                    value={formData.payment_schedule || 'monthly'}
+                    onChange={(e) =>
+                      setFormData({ ...formData, payment_schedule: e.target.value, agreement_type: 'rent' })
+                    }
+                  >
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="semi_annual">Semi-Annually</option>
+                    <option value="annual">Annually</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Security Deposit (ETB)</label>
+                  <input
+                    type="number"
+                    value={formData.security_deposit || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, security_deposit: e.target.value, agreement_type: 'rent' })
+                    }
+                    placeholder="e.g. 50000"
+                  />
+                </div>
+              </>
+            );
+          })()}
           <div className="form-group">
             <label>Notes</label>
             <textarea

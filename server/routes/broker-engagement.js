@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../config/db");
+const { generateRentalSchedule } = require("./rental-payments");
 
 // ============================================================================
 // HELPER: Log engagement history
@@ -70,14 +71,16 @@ router.get("/available-brokers", async (req, res) => {
 // ============================================================================
 router.post("/hire", async (req, res) => {
   try {
-    const { buyer_id, broker_id, property_id, starting_offer, buyer_message } = req.body;
+    const { buyer_id, broker_id, property_id, starting_offer, buyer_message,
+      engagement_type, rental_duration_months, payment_schedule, security_deposit
+    } = req.body;
 
     if (!buyer_id || !broker_id || !property_id) {
       return res.status(400).json({ success: false, message: "Buyer ID, Broker ID, and Property ID are required" });
     }
 
     // Get property details (owner)
-    const [property] = await db.query("SELECT owner_id, price FROM properties WHERE id = ?", [property_id]);
+    const [property] = await db.query("SELECT owner_id, price, listing_type FROM properties WHERE id = ?", [property_id]);
     if (property.length === 0) {
       return res.status(404).json({ success: false, message: "Property not found" });
     }
@@ -85,6 +88,9 @@ router.post("/hire", async (req, res) => {
     if (!owner_id) {
       return res.status(400).json({ success: false, message: "Property has no owner assigned" });
     }
+    
+    // Resolve type
+    const resolvedType = engagement_type || property[0].listing_type || 'sale';
 
     // Check for existing active engagement
     const [existing] = await db.query(
@@ -100,9 +106,15 @@ router.post("/hire", async (req, res) => {
     const offer = starting_offer || property[0].price;
     const [result] = await db.query(
       `INSERT INTO broker_engagements
-         (buyer_id, broker_id, property_id, owner_id, status, starting_offer, current_offer, buyer_message)
-       VALUES (?, ?, ?, ?, 'pending_broker_acceptance', ?, ?, ?)`,
-      [buyer_id, broker_id, property_id, owner_id, offer, offer, buyer_message || null]
+         (buyer_id, broker_id, property_id, owner_id, status, starting_offer, current_offer, buyer_message,
+          engagement_type, rental_duration_months, payment_schedule, security_deposit)
+       VALUES (?, ?, ?, ?, 'pending_broker_acceptance', ?, ?, ?, ?, ?, ?, ?)`,
+      [buyer_id, broker_id, property_id, owner_id, offer, offer, buyer_message || null,
+       resolvedType,
+       resolvedType === 'rent' ? (rental_duration_months || 12) : null,
+       resolvedType === 'rent' ? (payment_schedule || 'monthly') : null,
+       resolvedType === 'rent' ? (security_deposit || null) : null
+      ]
     );
 
     const engId = result.insertId;
@@ -685,13 +697,12 @@ router.post("/:id/generate-contract", async (req, res) => {
     const commissionAmount = (agreedPrice * commPct / 100).toFixed(2);
     const systemFee = (agreedPrice * 0.02).toFixed(2);
     const ownerNet = (agreedPrice - Number(commissionAmount) - Number(systemFee)).toFixed(2);
+    const isRental = eng.engagement_type === 'rent';
+    const rentalMonths = eng.rental_duration_months || 12;
+    const paymentSchedule = eng.payment_schedule || 'monthly';
+    const securityDeposit = Number(eng.security_deposit || 0);
 
-    const contractHTML = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Broker-Assisted Purchase Agreement - DDREMS #${eng.id}</title>
-  <style>
+    const sharedStyles = `
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Georgia', 'Times New Roman', serif; color: #1a1a2e; background: #fff; padding: 50px; max-width: 900px; margin: 0 auto; line-height: 1.7; }
     .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 100px; color: rgba(59, 130, 246, 0.04); font-weight: 900; letter-spacing: 10px; pointer-events: none; z-index: 0; }
@@ -710,7 +721,7 @@ router.post("/:id/generate-contract", async (req, res) => {
     .party-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; background: #fafbfc; }
     .party-box h4 { color: #0f3460; margin-bottom: 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
     .party-box p { font-size: 12px; color: #374151; line-height: 1.6; }
-    .price-highlight { text-align: center; background: linear-gradient(135deg, #1e3a5f, #16213e); color: #fff; border-radius: 10px; padding: 20px; margin: 16px 0; }
+    .price-highlight { text-align: center; border-radius: 10px; padding: 20px; margin: 16px 0; }
     .price-highlight .label { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.8; margin-bottom: 4px; }
     .price-highlight .amount { font-size: 36px; font-weight: 900; letter-spacing: 1px; }
     .breakdown-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -732,6 +743,156 @@ router.post("/:id/generate-contract", async (req, res) => {
     .footer p { margin-bottom: 2px; }
     .stamp { display: inline-block; border: 2px solid #3b82f6; border-radius: 8px; padding: 4px 12px; font-size: 10px; color: #3b82f6; font-weight: 700; letter-spacing: 1px; margin-top: 8px; }
     @media print { body { padding: 20px; } .watermark { display: none; } }
+    `;
+
+    let contractHTML = "";
+
+    if (isRental) {
+      const scheduleLabel = paymentSchedule.charAt(0).toUpperCase() + paymentSchedule.slice(1);
+      const totalRent = agreedPrice * rentalMonths;
+
+      contractHTML = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Broker-Assisted Lease Agreement - DDREMS #${eng.id}</title>
+  <style>
+    ${sharedStyles}
+    .price-highlight { background: linear-gradient(135deg, #065f46, #064e3b); color: #fff; }
+    .rental-badge { display: inline-block; background: #d1fae5; color: #065f46; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 1px; margin-left: 8px; }
+  </style>
+</head>
+<body>
+  <div class="watermark">DDREMS</div>
+
+  <div class="header">
+    <div class="logo">DDREMS</div>
+    <div class="subtitle">Residential Lease Agreement <span class="rental-badge">Rental</span></div>
+    <div class="tagline">Broker-Assisted Transaction • Dire Dawa Real Estate Management System</div>
+  </div>
+
+  <div class="meta-row">
+    <span>Agreement Reference: <strong>BALEASE-${String(eng.id).padStart(5, '0')}</strong></span>
+    <span>Date: <strong>${today}</strong></span>
+    <span>Status: <strong>Pending Signatures</strong></span>
+  </div>
+
+  <div class="section">
+    <h3 class="section-title">🏠 Property Information</h3>
+    <div class="info-grid">
+      <div class="info-item"><label>Property Title</label><span>${eng.property_title || "N/A"}</span></div>
+      <div class="info-item"><label>Location</label><span>${eng.property_location || "N/A"}</span></div>
+      <div class="info-item"><label>Property Type</label><span>${(eng.property_type || "N/A").charAt(0).toUpperCase() + (eng.property_type || "").slice(1)}</span></div>
+      <div class="info-item"><label>Listing Type</label><span>For Rent</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3 class="section-title">👥 Parties to this Agreement</h3>
+    <div class="party-grid">
+      <div class="party-box">
+        <h4>🙋 Tenant (Lessee)</h4>
+        <p><strong>${eng.buyer_name || "N/A"}</strong></p>
+        <p>${eng.buyer_email || "N/A"}</p>
+      </div>
+      <div class="party-box">
+        <h4>🤵 Broker (Representative)</h4>
+        <p><strong>${eng.broker_name || "N/A"}</strong></p>
+        <p>${eng.broker_email || "N/A"}</p>
+      </div>
+      <div class="party-box">
+        <h4>🏢 Landlord (Lessor)</h4>
+        <p><strong>${eng.owner_name || "N/A"}</strong></p>
+        <p>${eng.owner_email || "N/A"}</p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="section">
+    <h3 class="section-title">📅 Lease Terms</h3>
+    <div class="info-grid">
+      <div class="info-item"><label>Lease Duration</label><span>${rentalMonths} Month${rentalMonths > 1 ? 's' : ''}</span></div>
+      <div class="info-item"><label>Payment Schedule</label><span>${scheduleLabel}</span></div>
+      <div class="info-item"><label>Security Deposit</label><span>${securityDeposit > 0 ? securityDeposit.toLocaleString() + ' ETB' : 'None'}</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3 class="section-title">💰 Rent Amount</h3>
+    <div class="price-highlight">
+      <div class="label">Agreed Monthly Rent</div>
+      <div class="amount">${agreedPrice.toLocaleString()} ETB</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3 class="section-title">📊 Financial Summary</h3>
+    <table class="breakdown-table">
+      <thead><tr><th>Description</th><th style="text-align:right">Amount</th></tr></thead>
+      <tbody>
+        <tr><td>Monthly Rent</td><td class="amount">${agreedPrice.toLocaleString()} ETB</td></tr>
+        <tr><td>Lease Duration</td><td class="amount">${rentalMonths} months</td></tr>
+        ${securityDeposit > 0 ? `<tr><td>Security Deposit (refundable)</td><td class="amount">${securityDeposit.toLocaleString()} ETB</td></tr>` : ''}
+        <tr><td>Broker Commission (${commPct}%)</td><td class="amount">- ${Number(commissionAmount).toLocaleString()} ETB (from first payment)</td></tr>
+        <tr><td>System Service Fee (2%)</td><td class="amount">- ${Number(systemFee).toLocaleString()} ETB / month</td></tr>
+        <tr class="total"><td>Total Lease Contract Value</td><td class="amount">${Number(totalRent).toLocaleString()} ETB</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h3 class="section-title">📝 Lease Terms and Conditions</h3>
+    <div class="terms-text">
+      <ol>
+        <li><strong>Lease Agreement:</strong> The Landlord agrees to lease the above-described property to the Tenant at the agreed monthly rent of <strong>${agreedPrice.toLocaleString()} ETB</strong>, for a duration of <strong>${rentalMonths} months</strong>.</li>
+        <li><strong>Broker Representation:</strong> This transaction was facilitated by the named Broker, who shall receive a commission of <strong>${commPct}% (${Number(commissionAmount).toLocaleString()} ETB)</strong> deducted from the initial payment to the Landlord.</li>
+        <li><strong>Rent Payments:</strong> Rent is payable via the DDREMS platform on the agreed schedule (${scheduleLabel}).</li>
+        <li><strong>Security Deposit:</strong> ${securityDeposit > 0 ? `The Tenant shall pay a security deposit of <strong>${securityDeposit.toLocaleString()} ETB</strong> prior to move-in, refundable at the end of the term subject to property condition.` : 'No security deposit is required for this agreement.'}</li>
+        <li><strong>Termination & Signatures:</strong> This lease agreement is legally binding once digitally signed by all parties through the DDREMS system.</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3 class="section-title">✍️ Digital Signatures</h3>
+    <div class="signature-section">
+      <div class="signature-box">
+        <h4>Tenant</h4>
+        <div class="signature-line" id="sig-buyer">Awaiting Signature</div>
+        <div class="signature-name">${eng.buyer_name}</div>
+        <div class="signature-date" id="sig-buyer-date">Date: ___________</div>
+      </div>
+      <div class="signature-box">
+        <h4>Broker</h4>
+        <div class="signature-line" id="sig-broker">Awaiting Signature</div>
+        <div class="signature-name">${eng.broker_name}</div>
+        <div class="signature-date" id="sig-broker-date">Date: ___________</div>
+      </div>
+      <div class="signature-box">
+        <h4>Landlord</h4>
+        <div class="signature-line" id="sig-owner">Awaiting Signature</div>
+        <div class="signature-name">${eng.owner_name}</div>
+        <div class="signature-date" id="sig-owner-date">Date: ___________</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>This document was generated by the Dire Dawa Real Estate Management System (DDREMS)</p>
+    <p>Agreement Reference: BALEASE-${String(eng.id).padStart(5, '0')} | Generated: ${today}</p>
+    <div class="stamp">OFFICIAL DDREMS LEASE DOCUMENT</div>
+  </div>
+</body>
+</html>`;
+    } else {
+      contractHTML = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Broker-Assisted Purchase Agreement - DDREMS #${eng.id}</title>
+  <style>
+    ${sharedStyles}
+    .price-highlight { background: linear-gradient(135deg, #1e3a5f, #16213e); color: #fff; }
   </style>
 </head>
 <body>
@@ -806,12 +967,11 @@ router.post("/:id/generate-contract", async (req, res) => {
     <div class="terms-text">
       <ol>
         <li><strong>Sale Agreement:</strong> The Buyer agrees to purchase, and the Owner agrees to sell, the above-described property at the agreed price of <strong>${agreedPrice.toLocaleString()} ETB</strong>.</li>
-        <li><strong>Broker Representation:</strong> The Broker has acted as the authorized representative of the Buyer in negotiating this transaction. The Broker is entitled to a commission of <strong>${commPct}%</strong> of the agreed price.</li>
-        <li><strong>Payment:</strong> The Buyer shall submit the full agreed amount via the DDREMS platform. Payment must be verified by a system administrator before the ownership transfer can proceed.</li>
-        <li><strong>Property Handover:</strong> Upon payment verification, the Owner shall hand over the property to the Buyer within <strong>14 business days</strong> unless otherwise agreed upon by both parties.</li>
-        <li><strong>Dispute Resolution:</strong> Any disputes arising from this agreement shall be resolved through mediation facilitated by the DDREMS platform administration, and if unresolved, through the appropriate legal channels in Dire Dawa, Ethiopia.</li>
-        <li><strong>Governing Law:</strong> This agreement is governed by the laws of the Federal Democratic Republic of Ethiopia.</li>
-        <li><strong>Digital Signatures:</strong> All parties acknowledge that digital signatures applied through the DDREMS platform carry the same legal weight as physical signatures under applicable electronic transaction laws.</li>
+        <li><strong>Broker Representation:</strong> This transaction was facilitated by the named Broker, who shall receive a commission of <strong>${commPct}% (${Number(commissionAmount).toLocaleString()} ETB)</strong> deducted from the final payout to the Owner.</li>
+        <li><strong>System Fee:</strong> The transaction is subject to a 2% platform facilitation fee deducted from the final payout to the Owner.</li>
+        <li><strong>Payment:</strong> The Buyer shall submit the full agreed amount via the DDREMS platform.</li>
+        <li><strong>Property Handover:</strong> Upon payment verification, the Owner shall hand over the property to the Buyer within <strong>14 business days</strong> unless otherwise agreed upon.</li>
+        <li><strong>Signatures:</strong> Digital signatures applied through DDREMS are legally binding.</li>
       </ol>
     </div>
   </div>
@@ -822,19 +982,19 @@ router.post("/:id/generate-contract", async (req, res) => {
       <div class="signature-box">
         <h4>Buyer</h4>
         <div class="signature-line" id="sig-buyer">Awaiting Signature</div>
-        <div class="signature-name">${eng.buyer_name || "________________"}</div>
+        <div class="signature-name">${eng.buyer_name}</div>
         <div class="signature-date" id="sig-buyer-date">Date: ___________</div>
       </div>
       <div class="signature-box">
         <h4>Broker</h4>
         <div class="signature-line" id="sig-broker">Awaiting Signature</div>
-        <div class="signature-name">${eng.broker_name || "________________"}</div>
+        <div class="signature-name">${eng.broker_name}</div>
         <div class="signature-date" id="sig-broker-date">Date: ___________</div>
       </div>
       <div class="signature-box">
-        <h4>Owner</h4>
+        <h4>Property Owner</h4>
         <div class="signature-line" id="sig-owner">Awaiting Signature</div>
-        <div class="signature-name">${eng.owner_name || "________________"}</div>
+        <div class="signature-name">${eng.owner_name}</div>
         <div class="signature-date" id="sig-owner-date">Date: ___________</div>
       </div>
     </div>
@@ -847,6 +1007,7 @@ router.post("/:id/generate-contract", async (req, res) => {
   </div>
 </body>
 </html>`;
+    }
 
     // Store in agreement_documents
     await db.query(
@@ -858,8 +1019,8 @@ router.post("/:id/generate-contract", async (req, res) => {
 
     // Link the document to the engagement
     const [docResult] = await db.query(
-      `SELECT id FROM agreement_documents WHERE document_type = 'broker_assisted' AND document_content LIKE ? ORDER BY id DESC LIMIT 1`,
-      [`%BA-${String(eng.id).padStart(5, '0')}%`]
+      `SELECT id FROM agreement_documents WHERE document_type = 'broker_assisted' AND (document_content LIKE ? OR document_content LIKE ?) ORDER BY id DESC LIMIT 1`,
+      [`%BA-${String(eng.id).padStart(5, '0')}%`, `%BALEASE-${String(eng.id).padStart(5, '0')}%`]
     );
     const docId = docResult.length > 0 ? docResult[0].id : null;
 
@@ -900,9 +1061,9 @@ router.get("/:id/view-contract", async (req, res) => {
     const [docs] = await db.query(
       `SELECT * FROM agreement_documents 
        WHERE document_type = 'broker_assisted' 
-       AND document_content LIKE ?
+       AND (document_content LIKE ? OR document_content LIKE ?)
        ORDER BY id DESC LIMIT 1`,
-      [`%BA-${String(id).padStart(5, '0')}%`]
+      [`%BA-${String(id).padStart(5, '0')}%`, `%BALEASE-${String(id).padStart(5, '0')}%`]
     );
 
     if (docs.length === 0) {
@@ -1517,20 +1678,61 @@ router.put("/:id/release-funds", async (req, res) => {
       { agreed_price: agreedPrice, system_pct: sysPct, broker_pct: brkPct, system_amount: sysAmount, broker_amount: brkAmount, owner_payout: ownerPayout });
     await systemMessage(id, `🎉 Funds released! Owner payout: ${ownerPayout.toLocaleString()} ETB | Broker commission: ${brkAmount.toLocaleString()} ETB (${brkPct}%) | System fee: ${sysAmount.toLocaleString()} ETB (${sysPct}%). Transaction complete!`);
 
-    // Mark property as sold
-    try {
-      await db.query("UPDATE properties SET status = 'sold' WHERE id = ?", [eng.property_id]);
-    } catch (propErr) {
-      console.error("Property status update error (non-fatal):", propErr.message);
-    }
+    // Check if this is a rental engagement
+    const isRental = eng.engagement_type === 'rent';
 
-    // Notify all parties
-    await notifyUser(eng.buyer_id, "🎉 Purchase Complete!",
-      `Congratulations! Your property purchase is complete. Total paid: ${agreedPrice.toLocaleString()} ETB.`, "success");
-    await notifyUser(eng.broker_id, "🎉 Commission Earned!",
-      `Deal complete! You earned ${brkAmount.toLocaleString()} ETB (${brkPct}%) commission.`, "success");
-    await notifyUser(eng.owner_id, "🎉 Funds Released!",
-      `Your payout of ${ownerPayout.toLocaleString()} ETB has been released. System fee: ${sysAmount.toLocaleString()} ETB, Broker commission: ${brkAmount.toLocaleString()} ETB.`, "success");
+    if (isRental) {
+      // Mark property as rented (not sold)
+      try {
+        await db.query("UPDATE properties SET status = 'rented' WHERE id = ?", [eng.property_id]);
+      } catch (propErr) {
+        console.error("Property status update error (non-fatal):", propErr.message);
+      }
+
+      // Auto-generate rental payment schedule for months 2+
+      try {
+        const rentalMonths = Number(eng.rental_duration_months) || 12;
+        const scheduleCount = await generateRentalSchedule({
+          brokerEngagementId: eng.id,
+          tenantId: eng.buyer_id,
+          ownerId: eng.owner_id,
+          propertyId: eng.property_id,
+          monthlyRent: agreedPrice,
+          leaseDurationMonths: rentalMonths,
+          paymentSchedule: eng.payment_schedule || 'monthly',
+          brokerCommissionPct: brkPct,
+          systemFeePct: sysPct,
+          brokerId: eng.broker_id
+        });
+        console.log(`📅 Generated ${scheduleCount} rental payment installments for engagement #${id}`);
+        await systemMessage(id, `📅 Rental payment schedule created with ${scheduleCount} upcoming installments (months 2-${rentalMonths}).`);
+      } catch (schedErr) {
+        console.error("Rental schedule generation error (non-fatal):", schedErr.message);
+      }
+
+      // Notify all parties (rental wording)
+      await notifyUser(eng.buyer_id, "🎉 Lease Active!",
+        `Your lease is now active. First month's rent processed. ${Number(eng.rental_duration_months || 12) - 1} future payments scheduled. Check your Rent Payments tab.`, "success");
+      await notifyUser(eng.broker_id, "🎉 Commission Earned!",
+        `Rental deal complete! You earned ${brkAmount.toLocaleString()} ETB (${brkPct}%) commission from the first month's rent.`, "success");
+      await notifyUser(eng.owner_id, "🎉 Lease Finalized!",
+        `Your rental property lease is active. First payout: ${ownerPayout.toLocaleString()} ETB. Future rent payments will be collected automatically.`, "success");
+    } else {
+      // Mark property as sold
+      try {
+        await db.query("UPDATE properties SET status = 'sold' WHERE id = ?", [eng.property_id]);
+      } catch (propErr) {
+        console.error("Property status update error (non-fatal):", propErr.message);
+      }
+
+      // Notify all parties (sale wording)
+      await notifyUser(eng.buyer_id, "🎉 Purchase Complete!",
+        `Congratulations! Your property purchase is complete. Total paid: ${agreedPrice.toLocaleString()} ETB.`, "success");
+      await notifyUser(eng.broker_id, "🎉 Commission Earned!",
+        `Deal complete! You earned ${brkAmount.toLocaleString()} ETB (${brkPct}%) commission.`, "success");
+      await notifyUser(eng.owner_id, "🎉 Funds Released!",
+        `Your payout of ${ownerPayout.toLocaleString()} ETB has been released. System fee: ${sysAmount.toLocaleString()} ETB, Broker commission: ${brkAmount.toLocaleString()} ETB.`, "success");
+    }
 
     res.json({
       success: true,

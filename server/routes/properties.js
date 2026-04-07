@@ -368,8 +368,8 @@ router.post("/", async (req, res) => {
     const [result] = await db.query(
       `INSERT INTO properties (
         title, description, price, location, latitude, longitude, type, status, broker_id, owner_id, 
-        bedrooms, bathrooms, area, address, city, state, zip_code, features
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        bedrooms, bathrooms, area, address, city, state, zip_code, features, listing_type
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         title,
         description,
@@ -391,6 +391,7 @@ router.post("/", async (req, res) => {
         state || null,
         zip_code || null,
         features ? JSON.stringify(features) : null,
+        listing_type || "sale",
       ],
     );
 
@@ -422,10 +423,11 @@ router.put("/:id", async (req, res) => {
       bedrooms,
       bathrooms,
       area,
+      listing_type,
     } = req.body;
     await db.query(
       `UPDATE properties SET title = ?, description = ?, price = ?, location = ?, type = ?, 
-       status = ?, broker_id = ?, bedrooms = ?, bathrooms = ?, area = ? WHERE id = ?`,
+       status = ?, broker_id = ?, bedrooms = ?, bathrooms = ?, area = ?, listing_type = ? WHERE id = ?`,
       [
         title,
         description,
@@ -437,6 +439,7 @@ router.put("/:id", async (req, res) => {
         bedrooms,
         bathrooms,
         area,
+        listing_type || "sale",
         req.params.id,
       ],
     );

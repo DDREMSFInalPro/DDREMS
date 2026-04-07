@@ -26,6 +26,7 @@ import AIPricePredictor from "./components/AIPricePredictor";
 import Favorites from "./components/Favorites";
 import AgreementWorkflow from "./components/AgreementWorkflow";
 import BrokerEngagement from "./components/BrokerEngagement";
+import RentalLedger from "./components/RentalLedger";
 import Login from "./components/Login";
 
 function App() {
@@ -184,6 +185,8 @@ function App() {
         return <AgreementWorkflow user={user} onLogout={handleLogout} />;
       case "broker-engagement":
         return <BrokerEngagement user={user} onLogout={handleLogout} />;
+      case "rent-payments":
+        return <RentalLedger user={user} />;
       case "profile":
         if (user.role === "user")
           return <CustomerProfile user={user} onLogout={handleLogout} />;
