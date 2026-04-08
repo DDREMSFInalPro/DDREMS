@@ -37,7 +37,8 @@ async function generateRentalSchedule({
   // Month 1 is the initial payment already handled by the main workflow
   let stepMonths = 1;
   if (paymentSchedule === 'quarterly') stepMonths = 3;
-  if (paymentSchedule === 'yearly') stepMonths = 12;
+  if (paymentSchedule === 'semi_annual') stepMonths = 6;
+  if (paymentSchedule === 'annual' || paymentSchedule === 'yearly') stepMonths = 12;
 
   // Per user decision: schedule starts from Month 2
   // Month 1 is the initial payment already handled by the main workflow
@@ -175,10 +176,14 @@ router.get("/tenant/:tenantId", async (req, res) => {
     const { tenantId } = req.params;
     const [payments] = await db.query(
       `SELECT rps.*, p.title AS property_title, p.location AS property_location,
-              u.name AS owner_name
+              u.name AS owner_name,
+              COALESCE(ar.payment_schedule, be.payment_schedule, 'monthly') AS payment_schedule,
+              COALESCE(ar.rental_duration_months, be.rental_duration_months) AS lease_duration_months
        FROM rental_payment_schedules rps
        JOIN properties p ON rps.property_id = p.id
        JOIN users u ON rps.owner_id = u.id
+       LEFT JOIN agreement_requests ar ON rps.agreement_request_id = ar.id
+       LEFT JOIN broker_engagements be ON rps.broker_engagement_id = be.id
        WHERE rps.tenant_id = ?
        ORDER BY rps.due_date ASC`,
       [tenantId]
@@ -194,6 +199,8 @@ router.get("/tenant/:tenantId", async (req, res) => {
           property_title: pay.property_title,
           property_location: pay.property_location,
           owner_name: pay.owner_name,
+          payment_schedule: pay.payment_schedule || 'monthly',
+          lease_duration_months: pay.lease_duration_months,
           installments: []
         };
       }
@@ -216,10 +223,14 @@ router.get("/owner/:ownerId", async (req, res) => {
     const { ownerId } = req.params;
     const [payments] = await db.query(
       `SELECT rps.*, p.title AS property_title, p.location AS property_location,
-              u.name AS tenant_name
+              u.name AS tenant_name,
+              COALESCE(ar.payment_schedule, be.payment_schedule, 'monthly') AS payment_schedule,
+              COALESCE(ar.rental_duration_months, be.rental_duration_months) AS lease_duration_months
        FROM rental_payment_schedules rps
        JOIN properties p ON rps.property_id = p.id
        JOIN users u ON rps.tenant_id = u.id
+       LEFT JOIN agreement_requests ar ON rps.agreement_request_id = ar.id
+       LEFT JOIN broker_engagements be ON rps.broker_engagement_id = be.id
        WHERE rps.owner_id = ?
        ORDER BY rps.due_date ASC`,
       [ownerId]
@@ -234,6 +245,8 @@ router.get("/owner/:ownerId", async (req, res) => {
           property_title: pay.property_title,
           property_location: pay.property_location,
           tenant_name: pay.tenant_name,
+          payment_schedule: pay.payment_schedule || 'monthly',
+          lease_duration_months: pay.lease_duration_months,
           installments: []
         };
       }
@@ -255,11 +268,15 @@ router.get("/admin/all", async (req, res) => {
   try {
     const [payments] = await db.query(
       `SELECT rps.*, p.title AS property_title, p.location AS property_location,
-              t.name AS tenant_name, o.name AS owner_name
+              t.name AS tenant_name, o.name AS owner_name,
+              COALESCE(ar.payment_schedule, be.payment_schedule, 'monthly') AS payment_schedule,
+              COALESCE(ar.rental_duration_months, be.rental_duration_months) AS lease_duration_months
        FROM rental_payment_schedules rps
        JOIN properties p ON rps.property_id = p.id
        JOIN users t ON rps.tenant_id = t.id
        JOIN users o ON rps.owner_id = o.id
+       LEFT JOIN agreement_requests ar ON rps.agreement_request_id = ar.id
+       LEFT JOIN broker_engagements be ON rps.broker_engagement_id = be.id
        ORDER BY rps.due_date ASC`
     );
     res.json({ success: true, payments });

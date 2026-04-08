@@ -4,6 +4,42 @@ import "./RentalLedger.css";
 
 const API = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
+// ── Helper: human-readable schedule label ──
+const scheduleLabel = (s) => {
+  const map = {
+    monthly: "Monthly",
+    quarterly: "Quarterly",
+    semi_annual: "Semi-Annually",
+    annual: "Annually",
+    yearly: "Annually"
+  };
+  return map[s] || "Monthly";
+};
+
+// ── Helper: installment period label ──
+const periodLabel = (s) => {
+  const map = {
+    monthly: "Month",
+    quarterly: "Quarter",
+    semi_annual: "Half-Year",
+    annual: "Year",
+    yearly: "Year"
+  };
+  return map[s] || "Month";
+};
+
+// ── Helper: schedule badge color ──
+const scheduleBadgeStyle = (s) => {
+  const map = {
+    monthly: { background: "#dbeafe", color: "#1e40af", border: "1px solid #93c5fd" },
+    quarterly: { background: "#fef3c7", color: "#92400e", border: "1px solid #fcd34d" },
+    semi_annual: { background: "#e0e7ff", color: "#3730a3", border: "1px solid #a5b4fc" },
+    annual: { background: "#d1fae5", color: "#065f46", border: "1px solid #6ee7b7" },
+    yearly: { background: "#d1fae5", color: "#065f46", border: "1px solid #6ee7b7" }
+  };
+  return map[s] || map.monthly;
+};
+
 const RentalLedger = ({ user }) => {
   const [payments, setPayments] = useState([]);
   const [grouped, setGrouped] = useState([]);
@@ -36,6 +72,8 @@ const RentalLedger = ({ user }) => {
               property_location: pay.property_location,
               tenant_name: pay.tenant_name,
               owner_name: pay.owner_name,
+              payment_schedule: pay.payment_schedule || "monthly",
+              lease_duration_months: pay.lease_duration_months,
               installments: []
             };
           }
@@ -241,87 +279,112 @@ const RentalLedger = ({ user }) => {
       )}
 
       {/* Payment Groups */}
-      {grouped.map((group, gi) => (
-        <div key={gi} className="property-group">
-          <div className="property-group-header">
-            <div>
-              <h3>🏠 {group.property_title}</h3>
-              <span className="pg-meta">📍 {group.property_location}</span>
+      {grouped.map((group, gi) => {
+        const sched = group.payment_schedule || "monthly";
+        const badgeStyle = scheduleBadgeStyle(sched);
+
+        return (
+          <div key={gi} className="property-group">
+            <div className="property-group-header">
+              <div>
+                <h3>🏠 {group.property_title}</h3>
+                <span className="pg-meta">📍 {group.property_location}</span>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                {/* Schedule Badge */}
+                <span
+                  style={{
+                    display: "inline-block",
+                    padding: "4px 12px",
+                    borderRadius: "20px",
+                    fontSize: "0.78rem",
+                    fontWeight: 700,
+                    marginBottom: 6,
+                    ...badgeStyle
+                  }}
+                >
+                  🗓️ {scheduleLabel(sched)} Schedule
+                </span>
+                <br />
+                {group.lease_duration_months && (
+                  <span className="pg-meta" style={{ marginRight: 12 }}>
+                    ⏳ {group.lease_duration_months} Month Lease
+                  </span>
+                )}
+                {isTenant && <span className="pg-meta">Landlord: {group.owner_name}</span>}
+                {isOwner && <span className="pg-meta">Tenant: {group.tenant_name}</span>}
+                {isAdmin && <span className="pg-meta">{group.tenant_name} → {group.owner_name}</span>}
+              </div>
             </div>
-            <div style={{ textAlign: "right" }}>
-              {isTenant && <span className="pg-meta">Landlord: {group.owner_name}</span>}
-              {isOwner && <span className="pg-meta">Tenant: {group.tenant_name}</span>}
-              {isAdmin && <span className="pg-meta">{group.tenant_name} → {group.owner_name}</span>}
-            </div>
+
+            <table className="payment-table">
+              <thead>
+                <tr>
+                  <th>{periodLabel(sched)} #</th>
+                  <th>Due Date</th>
+                  <th>{scheduleLabel(sched)} Rent</th>
+                  <th>Status</th>
+                  <th>Paid On</th>
+                  <th>Reference</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {group.installments.map((pay) => {
+                  const dueSoon = isDueSoon(pay.due_date);
+                  const rowClass = pay.status === "overdue" ? "overdue-row" : dueSoon && pay.status === "pending" ? "due-soon-row" : "";
+
+                  return (
+                    <tr key={pay.id} className={rowClass}>
+                      <td><strong>{pay.installment_number}</strong></td>
+                      <td>
+                        {formatDate(pay.due_date)}
+                        {dueSoon && pay.status === "pending" && (
+                          <span style={{ color: "#f59e0b", fontSize: "0.75rem", display: "block" }}>⚡ Due Soon</span>
+                        )}
+                      </td>
+                      <td><strong>{Number(pay.amount).toLocaleString()} ETB</strong></td>
+                      <td>
+                        <span className={`status-badge ${pay.status}`}>
+                          {statusEmoji[pay.status] || "❓"} {pay.status.charAt(0).toUpperCase() + pay.status.slice(1)}
+                        </span>
+                      </td>
+                      <td>{pay.paid_at ? formatDate(pay.paid_at) : "—"}</td>
+                      <td>{pay.transaction_reference || "—"}</td>
+                      <td>
+                        {/* Tenant: Pay button for pending/overdue */}
+                        {isTenant && (pay.status === "pending" || pay.status === "overdue") && (
+                          <button className="action-btn pay" onClick={() => openPayModal(pay)}>
+                            💳 Pay Now
+                          </button>
+                        )}
+
+                        {/* Owner: Verify/Reject for submitted */}
+                        {isOwner && pay.status === "submitted" && (
+                          <button className="action-btn verify" onClick={() => openVerifyModal(pay)}>
+                            ✅ Verify
+                          </button>
+                        )}
+
+                        {/* Admin: Can also verify if needed */}
+                        {isAdmin && pay.status === "submitted" && (
+                          <button className="action-btn verify" onClick={() => openVerifyModal(pay)}>
+                            ✅ Verify
+                          </button>
+                        )}
+
+                        {pay.status === "paid" && (
+                          <span style={{ color: "#22c55e", fontSize: "0.8rem", fontWeight: 600 }}>✓ Verified</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-
-          <table className="payment-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Due Date</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Paid On</th>
-                <th>Reference</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {group.installments.map((pay) => {
-                const dueSoon = isDueSoon(pay.due_date);
-                const rowClass = pay.status === "overdue" ? "overdue-row" : dueSoon && pay.status === "pending" ? "due-soon-row" : "";
-
-                return (
-                  <tr key={pay.id} className={rowClass}>
-                    <td><strong>{pay.installment_number}</strong></td>
-                    <td>
-                      {formatDate(pay.due_date)}
-                      {dueSoon && pay.status === "pending" && (
-                        <span style={{ color: "#f59e0b", fontSize: "0.75rem", display: "block" }}>⚡ Due Soon</span>
-                      )}
-                    </td>
-                    <td><strong>{Number(pay.amount).toLocaleString()} ETB</strong></td>
-                    <td>
-                      <span className={`status-badge ${pay.status}`}>
-                        {statusEmoji[pay.status] || "❓"} {pay.status.charAt(0).toUpperCase() + pay.status.slice(1)}
-                      </span>
-                    </td>
-                    <td>{pay.paid_at ? formatDate(pay.paid_at) : "—"}</td>
-                    <td>{pay.transaction_reference || "—"}</td>
-                    <td>
-                      {/* Tenant: Pay button for pending/overdue */}
-                      {isTenant && (pay.status === "pending" || pay.status === "overdue") && (
-                        <button className="action-btn pay" onClick={() => openPayModal(pay)}>
-                          💳 Pay Now
-                        </button>
-                      )}
-
-                      {/* Owner: Verify/Reject for submitted */}
-                      {isOwner && pay.status === "submitted" && (
-                        <button className="action-btn verify" onClick={() => openVerifyModal(pay)}>
-                          ✅ Verify
-                        </button>
-                      )}
-
-                      {/* Admin: Can also verify if needed */}
-                      {isAdmin && pay.status === "submitted" && (
-                        <button className="action-btn verify" onClick={() => openVerifyModal(pay)}>
-                          ✅ Verify
-                        </button>
-                      )}
-
-                      {pay.status === "paid" && (
-                        <span style={{ color: "#22c55e", fontSize: "0.8rem", fontWeight: 600 }}>✓ Verified</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ))}
+        );
+      })}
 
       {/* ── Pay Modal ── */}
       {showPayModal && selectedPayment && (
@@ -329,7 +392,7 @@ const RentalLedger = ({ user }) => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>💳 Submit Rent Payment</h3>
             <p style={{ color: "#64748b", marginBottom: 16 }}>
-              Installment #{selectedPayment.installment_number} — <strong>{Number(selectedPayment.amount).toLocaleString()} ETB</strong>
+              {periodLabel(selectedPayment.payment_schedule || "monthly")} #{selectedPayment.installment_number} — <strong>{Number(selectedPayment.amount).toLocaleString()} ETB</strong>
               <br />Due: {formatDate(selectedPayment.due_date)}
             </p>
 
@@ -379,7 +442,7 @@ const RentalLedger = ({ user }) => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>✅ Verify Rent Payment</h3>
             <p style={{ color: "#64748b", marginBottom: 16 }}>
-              Installment #{selectedPayment.installment_number} — <strong>{Number(selectedPayment.amount).toLocaleString()} ETB</strong>
+              {periodLabel(selectedPayment.payment_schedule || "monthly")} #{selectedPayment.installment_number} — <strong>{Number(selectedPayment.amount).toLocaleString()} ETB</strong>
               <br />Ref: {selectedPayment.transaction_reference || "N/A"}
               <br />Method: {selectedPayment.payment_method || "N/A"}
             </p>
