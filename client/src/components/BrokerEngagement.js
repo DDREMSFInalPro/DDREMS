@@ -6,14 +6,19 @@ import "./BrokerEngagement.css";
 
 const API = "http://localhost:5000/api/broker-engagement";
 
+// Helper: detect rental engagement
+const isRentalEng = (eng) => eng?.engagement_type === 'rent';
+const bt = (eng) => isRentalEng(eng) ? 'Tenant' : 'Buyer';
+const ol = (eng) => isRentalEng(eng) ? 'Landlord' : 'Owner';
+
 const STATUS_MAP = {
   pending_broker_acceptance: { emoji: "⏳", label: "Pending Broker Acceptance", color: "#f59e0b" },
   broker_declined: { emoji: "❌", label: "Broker Declined", color: "#ef4444" },
   broker_negotiating: { emoji: "🤝", label: "Broker Negotiating", color: "#3b82f6" },
-  pending_buyer_approval: { emoji: "⏳", label: "Pending Buyer Approval", color: "#f59e0b" },
+  pending_buyer_approval: { emoji: "⏳", label: "Pending Approval", color: "#f59e0b" },
   owner_counter_offered: { emoji: "🔄", label: "Owner Counter-Offered", color: "#f97316" },
   broker_reviewing_counter: { emoji: "🔍", label: "Broker Reviewing Counter", color: "#8b5cf6" },
-  awaiting_buyer_authorization: { emoji: "🔔", label: "Awaiting Your Authorization", color: "#dc2626" },
+  awaiting_buyer_authorization: { emoji: "🔔", label: "Awaiting Authorization", color: "#dc2626" },
   broker_finalizing: { emoji: "✅", label: "Broker Finalizing", color: "#22c55e" },
   agreement_generated: { emoji: "📄", label: "Contract Ready", color: "#0891b2" },
   pending_signatures: { emoji: "✍️", label: "Pending Signatures", color: "#6366f1" },
@@ -409,16 +414,16 @@ const BrokerEngagement = ({ user }) => {
       );
     }
 
-    // Broker: draft offer for buyer approval
+    // Broker: draft offer for buyer/tenant approval
     if (isBroker && eng.status === "broker_negotiating") {
       btns.push(
         <button key="negotiate" className="eng-btn eng-btn-primary" onClick={() => openModal("broker_negotiate", eng)}>
-          📝 Draft Offer for Buyer
+          📝 Draft Offer for {bt(eng)}
         </button>
       );
     }
 
-    // Buyer: review broker's draft offer
+    // Buyer/Tenant: review broker's draft offer
     if (isBuyer && eng.status === "pending_buyer_approval") {
       btns.push(
         <button key="review_draft" className="eng-btn eng-btn-warning" onClick={() => openModal("buyer_review_draft", eng)}>
@@ -427,11 +432,11 @@ const BrokerEngagement = ({ user }) => {
       );
     }
 
-    // Broker: advise buyer
+    // Broker: advise buyer/tenant
     if (isBroker && eng.status === "broker_reviewing_counter") {
       btns.push(
         <button key="advise" className="eng-btn eng-btn-warning" onClick={() => openModal("broker_advise", eng)}>
-          📋 Advise Buyer
+          📋 Advise {bt(eng)}
         </button>
       );
     }
@@ -454,7 +459,7 @@ const BrokerEngagement = ({ user }) => {
       );
     }
 
-    // Buyer: authorize
+    // Buyer/Tenant: authorize
     if (isBuyer && eng.status === "awaiting_buyer_authorization") {
       btns.push(
         <button key="authorize" className="eng-btn eng-btn-danger" onClick={() => openModal("buyer_authorize", eng)}>
@@ -493,7 +498,7 @@ const BrokerEngagement = ({ user }) => {
       }
     }
 
-    // Buyer: pay now (after fully_signed or if payment_rejected)
+    // Buyer/Tenant: pay now (after fully_signed or if payment_rejected)
     if (isBuyer && (eng.status === "fully_signed" || eng.status === "payment_rejected")) {
       btns.push(
         <button key="pay" className="eng-btn eng-btn-success" onClick={() => openModal("submit_payment", eng)}>
@@ -514,7 +519,7 @@ const BrokerEngagement = ({ user }) => {
       );
     }
 
-    // Buyer or Owner: confirm handover
+    // Buyer/Tenant or Owner/Landlord: confirm handover
     if ((isBuyer || isOwner) && eng.status === "payment_verified") {
       const hasConfirmed = isBuyer ? eng.buyer_handover_confirmed : eng.owner_handover_confirmed;
       
@@ -645,13 +650,13 @@ const BrokerEngagement = ({ user }) => {
         {["pending_signatures", "fully_signed", "completed"].includes(eng.status) && (
           <div className="sig-section">
             <div className={`sig-item ${eng.status === "fully_signed" || eng.status === "completed" ? "signed" : "unsigned"}`}>
-              ✍️ Buyer
+              ✍️ {bt(eng)}
             </div>
             <div className={`sig-item ${eng.status === "fully_signed" || eng.status === "completed" ? "signed" : "unsigned"}`}>
               ✍️ Broker
             </div>
             <div className={`sig-item ${eng.status === "fully_signed" || eng.status === "completed" ? "signed" : "unsigned"}`}>
-              ✍️ Owner
+              ✍️ {ol(eng)}
             </div>
           </div>
         )}
@@ -738,7 +743,7 @@ const BrokerEngagement = ({ user }) => {
             <p style={{ fontSize: 48, margin: "0 0 12px" }}>🤝</p>
             <h4 style={{ margin: "0 0 8px", color: "#1e293b" }}>Accept Representation?</h4>
             <p style={{ color: "#64748b", fontSize: 14 }}>
-              You will represent the buyer in negotiations to purchase <strong>{selectedEngagement?.property_title}</strong>.
+              You will represent the {bt(selectedEngagement).toLowerCase()} in negotiations for <strong>{selectedEngagement?.property_title}</strong>.
             </p>
           </div>
         );
@@ -749,7 +754,7 @@ const BrokerEngagement = ({ user }) => {
             <p style={{ fontSize: 48, margin: "0 0 12px" }}>❌</p>
             <h4 style={{ margin: "0 0 8px", color: "#dc2626" }}>Reject Representation?</h4>
             <p style={{ color: "#64748b", fontSize: 14 }}>
-              You are declining to represent the buyer for <strong>{selectedEngagement?.property_title}</strong>.
+              You are declining to represent the {bt(selectedEngagement).toLowerCase()} for <strong>{selectedEngagement?.property_title}</strong>.
             </p>
             <div className="eng-form-group" style={{ textAlign: "left", marginTop: 16 }}>
               <label>Reason for Rejecting (optional)</label>
@@ -767,10 +772,16 @@ const BrokerEngagement = ({ user }) => {
         return (
           <>
             <p style={{ color: "#64748b", fontSize: 13, marginBottom: 12 }}>
-              Current offer: <strong>{Number(selectedEngagement?.current_offer || 0).toLocaleString()} ETB</strong>
+              Current offer: <strong>{Number(selectedEngagement?.current_offer || 0).toLocaleString()} ETB{isRentalEng(selectedEngagement) ? " / month" : ""}</strong>
             </p>
+            {isRentalEng(selectedEngagement) && (
+              <div style={{ padding: "8px 12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", marginBottom: "12px", fontSize: "13px", color: "#166534" }}>
+                <strong>⏳ Lease Duration:</strong> {selectedEngagement.rental_duration_months} Months<br/>
+                <strong>🗓️ Payment Schedule:</strong> <span style={{textTransform: 'capitalize'}}>{selectedEngagement.payment_schedule || 'monthly'}</span>
+              </div>
+            )}
             <p style={{ color: "#f59e0b", fontSize: 12, marginBottom: 12, fontStyle: "italic" }}>
-              ⚠️ This offer will be sent to the buyer for approval before going to the owner.
+              ⚠️ This offer will be sent to the {bt(selectedEngagement).toLowerCase()} for approval before going to the {ol(selectedEngagement).toLowerCase()}.
             </p>
             <div className="eng-form-group">
               <label>Proposed Offer Price (ETB) *</label>
@@ -795,16 +806,21 @@ const BrokerEngagement = ({ user }) => {
               </p>
             </div>
             <div style={{ background: "#fffbeb", border: "2px solid #f59e0b", borderRadius: 12, padding: 16, textAlign: "center", marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: "#92400e", fontWeight: 600, marginBottom: 4 }}>PROPOSED OFFER</div>
+              <div style={{ fontSize: 12, color: "#92400e", fontWeight: 600, marginBottom: 4 }}>PROPOSED {isRentalEng(selectedEngagement) ? "RENT" : "OFFER"}</div>
               <div style={{ fontSize: 28, fontWeight: 800, color: "#b45309" }}>
-                {Number(selectedEngagement?.draft_offer_price || 0).toLocaleString()} ETB
+                {Number(selectedEngagement?.draft_offer_price || 0).toLocaleString()} ETB{isRentalEng(selectedEngagement) ? " / month" : ""}
               </div>
+              {isRentalEng(selectedEngagement) && (
+                <div style={{ fontSize: 13, color: "#92400e", marginTop: 8 }}>
+                  <strong>Duration:</strong> {selectedEngagement.rental_duration_months} Months &nbsp;|&nbsp; <strong>Schedule:</strong> <span style={{textTransform: 'capitalize'}}>{selectedEngagement.payment_schedule || 'monthly'}</span>
+                </div>
+              )}
             </div>
             <div className="eng-form-group">
               <label>Your Decision *</label>
               <select value={formData.decision || ""} onChange={(e) => setFormData({ ...formData, decision: e.target.value })}>
                 <option value="">-- Select --</option>
-                <option value="approve">✅ Approve — Send to Owner</option>
+                <option value="approve">✅ Approve — Send to {ol(selectedEngagement)}</option>
                 <option value="reject">❌ Reject — Ask Broker to Revise</option>
               </select>
             </div>
@@ -826,8 +842,14 @@ const BrokerEngagement = ({ user }) => {
         return (
           <>
             <p style={{ color: "#64748b", fontSize: 13, marginBottom: 12 }}>
-              Broker's offer: <strong>{Number(selectedEngagement?.current_offer || 0).toLocaleString()} ETB</strong>
+              Broker's offer: <strong>{Number(selectedEngagement?.current_offer || 0).toLocaleString()} ETB{isRentalEng(selectedEngagement) ? " / month" : ""}</strong>
             </p>
+            {isRentalEng(selectedEngagement) && (
+              <div style={{ padding: "10px 14px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", marginBottom: "16px", fontSize: "13px", color: "#166534" }}>
+                <p style={{ margin: "0 0 4px" }}><strong>⏳ Lease Duration:</strong> {selectedEngagement.rental_duration_months} Months</p>
+                <p style={{ margin: 0 }}><strong>🗓️ Payment Schedule:</strong> <span style={{textTransform: 'capitalize'}}>{selectedEngagement.payment_schedule || 'monthly'}</span></p>
+              </div>
+            )}
             <div className="eng-form-group">
               <label>Your Decision *</label>
               <select value={formData.decision || ""} onChange={(e) => setFormData({ ...formData, decision: e.target.value })}>
@@ -865,15 +887,15 @@ const BrokerEngagement = ({ user }) => {
               <label>Your Recommendation *</label>
               <select value={formData.recommendation || ""} onChange={(e) => setFormData({ ...formData, recommendation: e.target.value })}>
                 <option value="">-- Select Your Recommendation --</option>
-                <option value="accept">✅ Recommend Accept — Good deal for the buyer</option>
+                <option value="accept">✅ Recommend Accept — Good deal for the {bt(selectedEngagement).toLowerCase()}</option>
                 <option value="counter">🔄 Recommend Counter — Suggest a different price</option>
                 <option value="walk_away">🚫 Recommend Walk Away — Not worth it</option>
               </select>
             </div>
             <div className="eng-form-group">
-              <label>Advice Message to Buyer *</label>
+              <label>Advice Message to {bt(selectedEngagement)} *</label>
               <textarea value={formData.message || ""} onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                placeholder="Explain your recommendation to the buyer..." rows="4" />
+                placeholder={`Explain your recommendation to the ${bt(selectedEngagement).toLowerCase()}...`} rows="4" />
             </div>
           </>
         );
@@ -951,8 +973,8 @@ const BrokerEngagement = ({ user }) => {
               Agreed price: <strong>{Number(selectedEngagement?.agreed_price || 0).toLocaleString()} ETB</strong>
             </p>
             <p style={{ color: "#94a3b8", fontSize: 13, marginTop: 8 }}>
-              This will create the binding contract for: Buyer, Broker, and Owner.
-              All three parties will need to sign in order: Buyer → Broker → Owner.
+              This will create the binding contract for: {bt(selectedEngagement)}, Broker, and {ol(selectedEngagement)}.
+              All three parties will need to sign in order: {bt(selectedEngagement)} → Broker → {ol(selectedEngagement)}.
             </p>
           </div>
         );
@@ -1178,7 +1200,7 @@ const BrokerEngagement = ({ user }) => {
                     const sig = signatures.find((s) => s.signer_role === role);
                     return (
                       <div key={role} className={`sig-item ${sig ? "signed" : "unsigned"}`}>
-                        {sig ? "✅" : "⬜"} {role.charAt(0).toUpperCase() + role.slice(1)}
+                        {sig ? "✅" : "⬜"} {role === 'buyer' ? bt(eng) : role === 'owner' ? ol(eng) : 'Broker'}
                         {sig && <div className="sig-time">{new Date(sig.signed_at).toLocaleString()}</div>}
                       </div>
                     );

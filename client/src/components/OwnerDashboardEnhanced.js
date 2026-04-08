@@ -295,7 +295,7 @@ const OwnerDashboardEnhanced = ({ user, onLogout }) => {
       );
       alert(
         status === "counter_offer"
-          ? "Counter offer sent to buyer!"
+          ? "Counter offer sent successfully!"
           : `Agreement request ${status} successfully!`,
       );
       fetchOwnerData();
@@ -1547,8 +1547,14 @@ const OwnerDashboardEnhanced = ({ user, onLogout }) => {
                           Price: {(request.property_price / 1000000).toFixed(2)}
                           M ETB
                         </p>
+                        {(request.agreement_type === 'rent' || request.agreement_type === 'rental' || request.property_listing_type === 'rent') && (
+                          <>
+                            <p>Duration: {request.rental_duration_months || 12} Months</p>
+                            <p style={{textTransform: 'capitalize'}}>Schedule: {request.payment_schedule || 'monthly'}</p>
+                          </>
+                        )}
                         <p>
-                          Customer: {request.customer_name} (
+                          {(request.agreement_type === 'rent' || request.property_listing_type === 'rent') ? 'Tenant' : 'Buyer'}: {request.customer_name} (
                           {request.customer_email})
                         </p>
                         <p>Request Message: {request.request_message}</p>
@@ -1887,10 +1893,10 @@ const OwnerDashboardEnhanced = ({ user, onLogout }) => {
                   <strong>Property:</strong> {counterRequest.property_title}
                 </p>
                 <p style={{ margin: "0 0 4px" }}>
-                  <strong>Buyer:</strong> {counterRequest.customer_name}
+                  <strong>{(counterRequest?.agreement_type === 'rent' || counterRequest?.property_listing_type === 'rent') ? 'Tenant' : 'Buyer'}:</strong> {counterRequest?.customer_name}
                 </p>
                 <p style={{ margin: 0 }}>
-                  <strong>Listed Price:</strong>{" "}
+                  <strong>Listed {(counterRequest?.agreement_type === 'rent' || counterRequest?.property_listing_type === 'rent') ? 'Rent' : 'Price'}:</strong>{" "}
                   {counterRequest.property_price
                     ? (counterRequest.property_price / 1000000).toFixed(2) +
                       "M ETB"
@@ -1933,7 +1939,7 @@ const OwnerDashboardEnhanced = ({ user, onLogout }) => {
                     fontSize: "13px",
                   }}
                 >
-                  Message to Buyer *
+                  Message to {(counterRequest?.agreement_type === 'rent' || counterRequest?.property_listing_type === 'rent') ? 'Tenant' : 'Buyer'} *
                 </label>
                 <textarea
                   value={counterMessage}

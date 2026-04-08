@@ -35,20 +35,28 @@ async function generateRentalSchedule({
 
   // Per user decision: schedule starts from Month 2
   // Month 1 is the initial payment already handled by the main workflow
+  let stepMonths = 1;
+  if (paymentSchedule === 'quarterly') stepMonths = 3;
+  if (paymentSchedule === 'yearly') stepMonths = 12;
+
+  // Per user decision: schedule starts from Month 2
+  // Month 1 is the initial payment already handled by the main workflow
   const startMonth = 2;
+  let installmentCounter = 1;
 
-  for (let i = startMonth; i <= leaseDurationMonths; i++) {
+  for (let currentMonth = startMonth; currentMonth <= leaseDurationMonths; currentMonth += stepMonths) {
     const dueDate = new Date(startDate);
-    dueDate.setMonth(dueDate.getMonth() + i - 1); // i=2 means next month
+    dueDate.setMonth(dueDate.getMonth() + currentMonth - 1); 
 
-    // Commission only on first scheduled payment (installment 1 = month 2)
-    // Per user decision: commission & fees are taken from the first payment only (which is month 1, handled by main flow)
-    // So all scheduled payments (month 2+) go fully to landlord
-    const ownerNet = monthlyRent;
+    // Calculate how many months this installment covers (handles partial periods at the end of the lease)
+    const monthsCovered = Math.min(stepMonths, leaseDurationMonths - currentMonth + 1);
+    
+    const installmentAmount = monthlyRent * monthsCovered;
+    const ownerNet = installmentAmount; // Full amount to owner
 
     scheduleRows.push({
-      installmentNumber: i - 1, // 1-indexed for display (installment 1 = month 2 of lease)
-      amount: monthlyRent,
+      installmentNumber: installmentCounter++,
+      amount: installmentAmount,
       dueDate: dueDate.toISOString().split('T')[0],
       ownerNet: ownerNet,
       commissionDeducted: false,

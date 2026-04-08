@@ -193,7 +193,7 @@ router.get("/owner/:ownerId", async (req, res) => {
   try {
     const [requests] = await db.query(
       `
-      SELECT ar.*, p.title as property_title, u.name as customer_name, 'agreement' as request_type
+      SELECT ar.*, p.title as property_title, p.listing_type as property_listing_type, u.name as customer_name, 'agreement' as request_type
       FROM agreement_requests ar
       JOIN properties p ON ar.property_id = p.id
       JOIN users u ON ar.customer_id = u.id

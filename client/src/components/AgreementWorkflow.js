@@ -7,18 +7,26 @@ import PageHeader from "./PageHeader";
 
 const API = "http://localhost:5000/api/agreement-workflow";
 
-const STEPS = [
+// Helper: detect rental agreement reliably
+const isRental = (agr) => agr?.agreement_type === 'rent' || agr?.property_listing_type === 'rent';
+const buyerOrTenant = (agr) => isRental(agr) ? 'Tenant' : 'Buyer';
+const ownerOrLandlord = (agr) => isRental(agr) ? 'Landlord' : 'Owner';
+const priceOrRent = (agr) => isRental(agr) ? 'Rent' : 'Price';
+
+const getSteps = (agr) => [
   { num: 1, label: "Request", icon: "📝" },
   { num: 2, label: "Admin Review", icon: "🔍" },
-  { num: 3, label: "Owner Decision", icon: "👤" },
+  { num: 3, label: `${ownerOrLandlord(agr)} Decision`, icon: "👤" },
   { num: 4, label: "PDF Generated", icon: "📄" },
-  { num: 5, label: "Buyer Signs", icon: "✍️" },
-  { num: 6, label: "Owner Signs", icon: "✍️" },
+  { num: 5, label: `${buyerOrTenant(agr)} Signs`, icon: "✍️" },
+  { num: 6, label: `${ownerOrLandlord(agr)} Signs`, icon: "✍️" },
   { num: 7, label: "Contract Locked", icon: "🔒" },
   { num: 9, label: "Payment", icon: "💰" },
   { num: 10, label: "Funds Verified", icon: "✅" },
   { num: 11, label: "Completed", icon: "🎉" },
 ];
+
+const STEPS = getSteps(null);
 
 const STATUS_MAP = {
   pending_admin_review: {
@@ -41,25 +49,25 @@ const STATUS_MAP = {
   },
   counter_offer_forwarded: {
     emoji: "🔄",
-    label: "Counter Offer — Awaiting Buyer",
+    label: "Counter Offer — Awaiting Response",
     color: "#f97316",
     step: 3,
   },
   buyer_counter_offer: {
     emoji: "🔄",
-    label: "Buyer Counter Offer — Pending Admin",
+    label: "Counter Offer — Pending Admin",
     color: "#8b5cf6",
     step: 3,
   },
   buyer_counter_offer_forwarded: {
     emoji: "🔄",
-    label: "Buyer Counter Offer — Awaiting Owner",
+    label: "Counter Offer — Awaiting Owner",
     color: "#6366f1",
     step: 3,
   },
   buyer_rejected: {
     emoji: "❌",
-    label: "Buyer Rejected",
+    label: "Rejected",
     color: "#ef4444",
     step: 3,
   },
@@ -77,7 +85,7 @@ const STATUS_MAP = {
   },
   buyer_signed: {
     emoji: "✍️",
-    label: "Buyer Signed",
+    label: "Signed",
     color: "#06b6d4",
     step: 5,
   },
@@ -374,7 +382,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
 
         {/* ── Step Progress ── */}
         <div className="step-dots">
-          {STEPS.map((s) => (
+          {getSteps(agr).map((s) => (
             <div
               key={s.num}
               className={`dot ${agr.current_step >= s.num ? "active" : ""} ${agr.current_step === s.num ? "current" : ""}`}
@@ -403,34 +411,40 @@ const AgreementWorkflow = ({ user, onLogout }) => {
             <span className="lbl">🏠 Property</span>
             <span className="val">{agr.property_title || "N/A"}</span>
           </div>
-          {agr.agreement_type === 'rent' && (
+          {isRental(agr) && (
             <div className="info-row">
               <span className="lbl">🏷️ Type</span>
               <span className="val" style={{color: '#065f46', fontWeight: 700}}>🔑 Rental</span>
             </div>
           )}
           <div className="info-row">
-            <span className="lbl">👤 {agr.agreement_type === 'rent' ? 'Tenant' : 'Buyer'}</span>
+            <span className="lbl">👤 {buyerOrTenant(agr)}</span>
             <span className="val">{agr.customer_name || "N/A"}</span>
           </div>
           <div className="info-row">
-            <span className="lbl">🏢 {agr.agreement_type === 'rent' ? 'Landlord' : 'Owner'}</span>
+            <span className="lbl">🏢 {ownerOrLandlord(agr)}</span>
             <span className="val">{agr.owner_name || "N/A"}</span>
           </div>
           <div className="info-row">
-            <span className="lbl">💰 {agr.agreement_type === 'rent' ? 'Rent' : 'Price'}</span>
+            <span className="lbl">💰 {priceOrRent(agr)}</span>
             <span className="val">
               {Number(
                 agr.proposed_price || agr.property_price || 0,
               ).toLocaleString()}{" "}
-              ETB{agr.agreement_type === 'rent' ? ' / month' : ''}
+              ETB{isRental(agr) ? ' / month' : ''}
             </span>
           </div>
-          {agr.agreement_type === 'rent' && agr.rental_duration_months && (
-            <div className="info-row">
-              <span className="lbl">📅 Duration</span>
-              <span className="val">{agr.rental_duration_months} Months</span>
-            </div>
+          {isRental(agr) && (
+            <>
+              <div className="info-row">
+                <span className="lbl">📅 Duration</span>
+                <span className="val">{agr.rental_duration_months || 12} Months</span>
+              </div>
+              <div className="info-row">
+                <span className="lbl">🗓️ Schedule</span>
+                <span className="val" style={{textTransform: 'capitalize'}}>{agr.payment_schedule || 'monthly'}</span>
+              </div>
+            </>
           )}
           {agr.move_in_date && (
             <div className="info-row">
@@ -452,11 +466,11 @@ const AgreementWorkflow = ({ user, onLogout }) => {
         {agr.current_step >= 4 && (
           <div className="sig-status">
             <span className={agr.buyer_signed ? "signed" : "unsigned"}>
-              {agr.buyer_signed ? "✅" : "⬜"} Buyer{" "}
+              {agr.buyer_signed ? "✅" : "⬜"} {buyerOrTenant(agr)}{" "}
               {agr.buyer_signed ? "Signed" : "Not Signed"}
             </span>
             <span className={agr.owner_signed ? "signed" : "unsigned"}>
-              {agr.owner_signed ? "✅" : "⬜"} Owner{" "}
+              {agr.owner_signed ? "✅" : "⬜"} {ownerOrLandlord(agr)}{" "}
               {agr.owner_signed ? "Signed" : "Not Signed"}
             </span>
           </div>
@@ -499,7 +513,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
             className="btn-warning"
             onClick={() => openModal(agr, "forward_counter")}
           >
-            🔄 Forward Counter Offer to Buyer
+            🔄 Forward Counter Offer to {buyerOrTenant(agr)}
           </button>
         )}
         {isAdmin && agr.status === "buyer_counter_offer" && (
@@ -507,7 +521,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
             className="btn-warning"
             onClick={() => openModal(agr, "forward_buyer_counter")}
           >
-            🔄 Forward Buyer Counter to Owner
+            🔄 Forward {buyerOrTenant(agr)} Counter to {ownerOrLandlord(agr)}
           </button>
         )}
         {isAdmin && agr.status === "owner_accepted" && (
@@ -549,7 +563,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
             className="btn-warning"
             onClick={() => openModal(agr, "decision")}
           >
-            🔄 Respond to Buyer Counter Offer
+            🔄 Respond to {buyerOrTenant(agr)} Counter Offer
           </button>
         )}
         {isOwner && agr.status === "buyer_signed" && (
@@ -561,7 +575,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
           </button>
         )}
 
-        {/* ── Buyer Actions ── */}
+        {/* ── Tenant/Buyer Actions ── */}
         {isBuyer &&
           (agr.status === "counter_offer" ||
             agr.status === "counter_offer_forwarded") && (
@@ -641,16 +655,16 @@ const AgreementWorkflow = ({ user, onLogout }) => {
               <span>{a.property_location || "N/A"}</span>
             </div>
             <div>
-              <strong>Buyer</strong>
+              <strong>{buyerOrTenant(a)}</strong>
               <span>{a.customer_name}</span>
             </div>
             <div>
-              <strong>Owner</strong>
+              <strong>{ownerOrLandlord(a)}</strong>
               <span>{a.owner_name}</span>
             </div>
             <div>
-              <strong>Listed Price</strong>
-              <span>{Number(a.listed_price || 0).toLocaleString()} ETB</span>
+              <strong>Listed {priceOrRent(a)}</strong>
+              <span>{Number(a.listed_price || 0).toLocaleString()} ETB{isRental(a) ? ' / month' : ''}</span>
             </div>
             <div>
               <strong>Proposed Price</strong>
@@ -658,14 +672,14 @@ const AgreementWorkflow = ({ user, onLogout }) => {
                 {Number(
                   a.proposed_price || a.property_price || 0,
                 ).toLocaleString()}{" "}
-                ETB {a.agreement_type === 'rent' ? '/ month' : ''}
+                ETB {isRental(a) ? '/ month' : ''}
               </span>
             </div>
-            {a.agreement_type === 'rent' && (
+            {isRental(a) && (
               <>
                 <div>
                   <strong>Lease Duration</strong>
-                  <span>{a.rental_duration_months} Months</span>
+                  <span>{a.rental_duration_months || 12} Months</span>
                 </div>
                 <div>
                   <strong>Payment Schedule</strong>
@@ -686,11 +700,11 @@ const AgreementWorkflow = ({ user, onLogout }) => {
               </div>
             )}
             <div>
-              <strong>Buyer Signed</strong>
+              <strong>{buyerOrTenant(a)} Signed</strong>
               <span>{a.buyer_signed ? "✅ Yes" : "❌ No"}</span>
             </div>
             <div>
-              <strong>Owner Signed</strong>
+              <strong>{ownerOrLandlord(a)} Signed</strong>
               <span>{a.owner_signed ? "✅ Yes" : "❌ No"}</span>
             </div>
             <div>
@@ -725,7 +739,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
           </div>
           {a.customer_notes && (
             <div className="note-box">
-              <strong>Buyer Notes:</strong> {a.customer_notes}
+              <strong>{buyerOrTenant(a)} Notes:</strong> {a.customer_notes}
             </div>
           )}
           {a.owner_notes && (
@@ -746,7 +760,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
             const isOwner = user.role === "owner";
             const isBuyer = user.role === "user" || user.role === "customer";
 
-            // Buyer responding to a forwarded counter offer
+            // Buyer/Tenant responding to a forwarded counter offer
             if (
               isBuyer &&
               (a.status === "counter_offer" ||
@@ -763,7 +777,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
                   }}
                 >
                   <h4 style={{ margin: "0 0 12px", color: "#c2410c" }}>
-                    🔄 Owner's Counter Offer — Your Response
+                    🔄 {ownerOrLandlord(a)}'s Counter Offer — Your Response
                   </h4>
                   <div className="form-group" style={{ marginBottom: "12px" }}>
                     <label
@@ -930,7 +944,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
                   }}
                 >
                   <h4 style={{ margin: "0 0 8px", color: "#92400e" }}>
-                    🔄 Forward Owner Counter Offer to Buyer
+                    🔄 Forward {ownerOrLandlord(a)} Counter Offer to {buyerOrTenant(a)}
                   </h4>
                   <p
                     style={{
@@ -951,7 +965,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
                         fontSize: "13px",
                       }}
                     >
-                      Admin Notes to Buyer (optional)
+                      Admin Notes to {buyerOrTenant(a)} (optional)
                     </label>
                     <textarea
                       value={formData.notes || ""}
@@ -959,7 +973,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
                         setFormData({ ...formData, notes: e.target.value })
                       }
                       rows="2"
-                      placeholder="Add context for the buyer..."
+                      placeholder={`Add context for the ${buyerOrTenant(a).toLowerCase()}...`}
                       style={{
                         width: "100%",
                         padding: "9px 12px",
@@ -1004,7 +1018,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
                       fontSize: "13px",
                     }}
                   >
-                    {actionLoading ? "⏳ Forwarding..." : "🔄 Forward to Buyer"}
+                    {actionLoading ? "⏳ Forwarding..." : `🔄 Forward to ${buyerOrTenant(a)}`}
                   </button>
                 </div>
               );
@@ -1023,7 +1037,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
                   }}
                 >
                   <h4 style={{ margin: "0 0 8px", color: "#5b21b6" }}>
-                    🔄 Forward Buyer Counter Offer to Owner
+                    🔄 Forward {buyerOrTenant(a)} Counter Offer to {ownerOrLandlord(a)}
                   </h4>
                   <p
                     style={{
@@ -1032,7 +1046,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
                       marginBottom: "12px",
                     }}
                   >
-                    <strong>Buyer's Terms:</strong>{" "}
+                    <strong>{buyerOrTenant(a)}'s Terms:</strong>{" "}
                     {a.customer_notes || "No additional notes"}
                   </p>
                   <div className="form-group" style={{ marginBottom: "12px" }}>
@@ -1391,17 +1405,22 @@ const AgreementWorkflow = ({ user, onLogout }) => {
               📋 <strong>Property:</strong> {selectedAgreement?.property_title}
             </p>
             <p>
-              👤 <strong>Buyer:</strong> {selectedAgreement?.customer_name}
+              👤 <strong>{buyerOrTenant(selectedAgreement)}:</strong> {selectedAgreement?.customer_name}
             </p>
             <p>
-              💰 <strong>Price:</strong>{" "}
+              💰 <strong>{isRental(selectedAgreement) ? "Proposed Rent" : "Price"}:</strong>{" "}
               {Number(
                 selectedAgreement?.proposed_price ||
                   selectedAgreement?.property_price ||
                   0,
               ).toLocaleString()}{" "}
-              ETB
+              ETB{isRental(selectedAgreement) ? " / month" : ""}
             </p>
+            {isRental(selectedAgreement) && (
+              <p style={{ marginTop: "8px", borderTop: "1px solid #e5e7eb", paddingTop: "8px" }}>
+                ⏳ <strong>Duration:</strong> {selectedAgreement.rental_duration_months || 12} Months | 🗓️ <strong>Schedule:</strong> <span style={{textTransform:'capitalize'}}>{selectedAgreement.payment_schedule || 'monthly'}</span>
+              </p>
+            )}
           </div>
           <div className="form-group">
             <label>Admin Notes (optional)</label>
@@ -1619,19 +1638,19 @@ const AgreementWorkflow = ({ user, onLogout }) => {
               📋 <strong>Property:</strong> {selectedAgreement?.property_title}
             </p>
             <p>
-              👤 <strong>Buyer:</strong> {selectedAgreement?.customer_name}
+              👤 <strong>{buyerOrTenant(selectedAgreement)}:</strong> {selectedAgreement?.customer_name}
             </p>
             <p>
               💰{" "}
               <strong>
-                {isBuyerCounter ? "Original Price" : "Proposed Price"}:
+                {isBuyerCounter ? "Original Price" : `Proposed ${priceOrRent(selectedAgreement)}`}:
               </strong>{" "}
               {Number(
                 selectedAgreement?.proposed_price ||
                   selectedAgreement?.property_price ||
                   0,
               ).toLocaleString()}{" "}
-              ETB
+              ETB{isRental(selectedAgreement) ? ' / month' : ''}
             </p>
             {isBuyerCounter && buyerCounterPrice && (
               <p
@@ -1642,12 +1661,12 @@ const AgreementWorkflow = ({ user, onLogout }) => {
                   fontSize: "15px",
                 }}
               >
-                🔄 Buyer's Counter Price: {buyerCounterPrice} ETB
+                🔄 {buyerOrTenant(selectedAgreement)}'s Counter Price: {buyerCounterPrice} ETB
               </p>
             )}
             {isBuyerCounter && buyerMessage && (
               <p style={{ marginTop: "6px", color: "#4c1d95" }}>
-                <strong>Buyer's Message:</strong> {buyerMessage}
+                <strong>{buyerOrTenant(selectedAgreement)}'s Message:</strong> {buyerMessage}
               </p>
             )}
             {isBuyerCounter &&
@@ -1655,7 +1674,7 @@ const AgreementWorkflow = ({ user, onLogout }) => {
               !buyerMessage &&
               buyerNotes && (
                 <p style={{ marginTop: "6px", color: "#4c1d95" }}>
-                  <strong>Buyer's Terms:</strong> {buyerNotes}
+                  <strong>{buyerOrTenant(selectedAgreement)}'s Terms:</strong> {buyerNotes}
                 </p>
               )}
             {selectedAgreement?.move_in_date && (
@@ -1663,6 +1682,16 @@ const AgreementWorkflow = ({ user, onLogout }) => {
                 📅 <strong>Move-in:</strong>{" "}
                 {new Date(selectedAgreement.move_in_date).toLocaleDateString()}
               </p>
+            )}
+            {isRental(selectedAgreement) && (
+              <>
+                <p>
+                  ⏳ <strong>Duration:</strong> {selectedAgreement.rental_duration_months} Months
+                </p>
+                <p style={{ textTransform: 'capitalize' }}>
+                  🗓️ <strong>Schedule:</strong> {selectedAgreement.payment_schedule || "Monthly"}
+                </p>
+              </>
             )}
           </div>
           <div className="form-group">
@@ -2080,14 +2109,14 @@ const AgreementWorkflow = ({ user, onLogout }) => {
     const titles = {
       details: "📋 Agreement Details",
       request: "📝 New Agreement Request",
-      forward: "➡️ Forward to Owner",
-      forward_counter: "🔄 Forward Counter Offer to Buyer",
-      forward_buyer_counter: "🔄 Forward Buyer Counter Offer to Owner",
+      forward: `➡️ Forward to ${selectedAgreement ? ownerOrLandlord(selectedAgreement) : "Owner"}`,
+      forward_counter: `🔄 Forward Counter Offer to ${selectedAgreement ? buyerOrTenant(selectedAgreement) : "Buyer"}`,
+      forward_buyer_counter: `🔄 Forward ${selectedAgreement ? buyerOrTenant(selectedAgreement) : "Buyer"} Counter Offer to ${selectedAgreement ? ownerOrLandlord(selectedAgreement) : "Owner"}`,
       buyer_counter_response: "🔄 Respond to Counter Offer",
-      decision: "👤 Owner Decision",
+      decision: `👤 ${selectedAgreement ? ownerOrLandlord(selectedAgreement) : "Owner"} Decision`,
       generate: "📄 Generate Agreement",
       buyer_sign: "✍️ Sign Agreement",
-      owner_sign: "✍️ Sign as Owner",
+      owner_sign: `✍️ Sign as ${selectedAgreement ? ownerOrLandlord(selectedAgreement) : "Owner"}`,
       submit_payment: "💰 Submit Payment",
       verify_payment: "✅ Verify Payment",
       confirm_handover: "🔑 Confirm Handover",

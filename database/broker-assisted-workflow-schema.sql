@@ -144,12 +144,21 @@ SELECT
   p.location AS property_location,
   p.price AS property_price,
   p.type AS property_type,
+  p.listing_type AS property_listing_type,
   buyer.name AS buyer_name,
   buyer.email AS buyer_email,
   broker.name AS broker_name,
   broker.email AS broker_email,
   owner.name AS owner_name,
-  owner.email AS owner_email
+  owner.email AS owner_email,
+  COALESCE(
+    (
+      SELECT json_agg(bes.signer_role)
+      FROM broker_engagement_signatures bes
+      WHERE bes.engagement_id = be.id
+    ),
+    '[]'::json
+  ) AS signed_roles
 FROM broker_engagements be
 JOIN properties p ON be.property_id = p.id
 JOIN users buyer ON be.buyer_id = buyer.id

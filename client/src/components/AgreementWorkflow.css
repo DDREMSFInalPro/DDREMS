@@ -381,13 +381,21 @@
   background: #f0f9ff;
   border-radius: 10px;
   border: 1px solid #bae6fd;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
 }
 .info-banner p {
-  margin: 0 0 5px;
+  margin: 0;
   font-size: 13px;
   color: #0c4a6e;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-.info-banner p:last-child { margin-bottom: 0; }
+.info-banner p strong {
+  margin-top: -2px;
+}
 
 .confirm-box {
   text-align: center;
